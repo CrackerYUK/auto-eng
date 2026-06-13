@@ -16,6 +16,27 @@ from permits.models import Equipment, Hazard, Permit, PermitStatus, SafetyMeasur
 from users.roles import ROLE_CHIEF, ROLE_MASTER, ROLE_OPERATOR
 
 
+class AuthenticationViewTests(TestCase):
+    """Checks that users can log in through the web UI."""
+
+    def test_user_can_log_in_with_valid_credentials(self):
+        user_model = get_user_model()
+        user_model.objects.create_user(username="operator-login", password="secret-pass")
+
+        response = self.client.post(
+            reverse("login"),
+            data={"username": "operator-login", "password": "secret-pass"},
+        )
+
+        self.assertRedirects(response, reverse("permits:list"))
+
+    def test_login_page_renders(self):
+        response = self.client.get(reverse("login"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Login")
+
+
 class PermitViewTests(TestCase):
     """Checks page availability and basic permit form behaviour."""
 

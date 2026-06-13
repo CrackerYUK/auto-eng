@@ -14,6 +14,7 @@ def healthcheck(_request):
 urlpatterns = [
     path("", lambda _request: redirect("permits:list"), name="home"),
     path("admin/", admin.site.urls),
+    path("accounts/", include("django.contrib.auth.urls")),
     path("health/", healthcheck, name="healthcheck"),
     path("permits/", include("permits.urls")),
 ]
