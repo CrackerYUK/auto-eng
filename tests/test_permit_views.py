@@ -628,27 +628,35 @@ class PermitDocxGenerationViewTests(TestCase):
             created_by=self.operator,
         )
 
-    def create_template(self):
+    def create_template(
+        self,
+        name="Permit template",
+        version="web-docx-test-1",
+        template_text="Permit {{ permit.number }}",
+        is_active=True,
+        document_type="permit",
+    ):
         from io import BytesIO
 
         from django.core.files.uploadedfile import SimpleUploadedFile
         from docx import Document
 
         document = Document()
-        document.add_paragraph("Permit {{ permit.number }}")
+        document.add_paragraph(template_text)
         document.add_paragraph("Location {{ permit.work_location }}")
         output = BytesIO()
         document.save(output)
         return DocumentTemplate.objects.create(
-            name="Permit template",
-            document_type="permit",
-            version="web-docx-test-1",
+            name=name,
+            document_type=document_type,
+            version=version,
             file=SimpleUploadedFile(
                 "permit_template.docx",
                 output.getvalue(),
                 content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
             ),
             uploaded_by=self.operator,
+            is_active=is_active,
         )
 
     def test_generate_docx_creates_document_and_saves_file(self):
@@ -670,6 +678,77 @@ class PermitDocxGenerationViewTests(TestCase):
             response,
             reverse("permits:download_document", kwargs={"pk": generated_document.pk}),
         )
+
+    def test_permit_detail_allows_user_to_choose_active_template(self):
+        permit = self.make_permit(number="PT-WEB-DOCX-SELECT")
+        first_template = self.create_template(name="First permit template", version="select-1")
+        latest_template = self.create_template(name="Latest permit template", version="select-2")
+        inactive_template = self.create_template(
+            name="Inactive permit template",
+            version="select-inactive",
+            is_active=False,
+        )
+
+        response = self.client.get(reverse("permits:detail", kwargs={"pk": permit.pk}))
+
+        self.assertContains(response, 'name="template_id"')
+        self.assertContains(response, f'value="{first_template.pk}"')
+        self.assertContains(response, f'value="{latest_template.pk}" selected')
+        self.assertNotContains(response, f'value="{inactive_template.pk}"')
+
+    def test_generate_docx_uses_selected_template(self):
+        permit = self.make_permit(number="PT-WEB-DOCX-SELECTED")
+        fallback_template = self.create_template(
+            name="Fallback template",
+            version="selected-fallback",
+            template_text="Fallback {{ permit.number }}",
+        )
+        selected_template = self.create_template(
+            name="Selected template",
+            version="selected-template",
+            template_text="Selected {{ permit.number }}",
+        )
+
+        response = self.client.post(
+            reverse("permits:generate_docx", kwargs={"pk": permit.pk}),
+            data={"template_id": selected_template.pk},
+            follow=True,
+        )
+
+        generated_document = GeneratedDocument.objects.get(permit=permit)
+        self.assertRedirects(response, reverse("permits:detail", kwargs={"pk": permit.pk}))
+        self.assertEqual(generated_document.template, selected_template)
+        self.assertNotEqual(generated_document.template, fallback_template)
+
+    def test_generate_docx_without_template_id_falls_back_to_latest_active_template(self):
+        permit = self.make_permit(number="PT-WEB-DOCX-FALLBACK")
+        self.create_template(name="Older template", version="fallback-old")
+        latest_template = self.create_template(name="Latest template", version="fallback-latest")
+
+        response = self.client.post(
+            reverse("permits:generate_docx", kwargs={"pk": permit.pk}),
+            follow=True,
+        )
+
+        generated_document = GeneratedDocument.objects.get(permit=permit)
+        self.assertRedirects(response, reverse("permits:detail", kwargs={"pk": permit.pk}))
+        self.assertEqual(generated_document.template, latest_template)
+
+    def test_inactive_template_cannot_be_selected_for_generation(self):
+        permit = self.make_permit(number="PT-WEB-DOCX-INACTIVE")
+        inactive_template = self.create_template(
+            name="Inactive template",
+            version="inactive-selected",
+            is_active=False,
+        )
+
+        response = self.client.post(
+            reverse("permits:generate_docx", kwargs={"pk": permit.pk}),
+            data={"template_id": inactive_template.pk},
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(GeneratedDocument.objects.filter(permit=permit).exists())
 
     def test_generated_docx_link_is_shown_on_permit_detail(self):
         permit = self.make_permit(number="PT-WEB-DOCX-002")

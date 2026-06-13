@@ -46,6 +46,12 @@
     {% if can_generate_docx %}
     <form method="post" action="{% url 'permits:generate_docx' permit.pk %}">
         {% csrf_token %}
+        <label for="template-id">Document template</label>
+        <select id="template-id" name="template_id">
+            {% for template in active_document_templates %}
+            <option value="{{ template.pk }}"{% if template == default_document_template %} selected{% endif %}>{{ template }}</option>
+            {% endfor %}
+        </select>
         <button type="submit">Сгенерировать DOCX</button>
     </form>
     {% else %}

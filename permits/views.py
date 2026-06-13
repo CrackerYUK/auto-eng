@@ -146,6 +146,9 @@ class PermitDetailView(LoginRequiredMixin, DetailView):
             object_id=str(permit.pk),
             action__in=["permit.created", "permit.updated"],
         ).select_related("user")
+        active_templates = get_active_permit_templates()
+        context["active_document_templates"] = active_templates
+        context["default_document_template"] = active_templates.first()
         context["available_actions"] = [
             {"name": action, "label": ACTION_LABELS[action]}
             for action in ACTION_HANDLERS
@@ -230,18 +233,18 @@ def permit_action(request, pk, action):
 @login_required
 @require_POST
 def generate_docx(request, pk):
-    """Generate a DOCX document for a permit using the active permit template."""
+    """Generate a DOCX document for a permit using a selected active template."""
     permit = get_object_or_404(Permit, pk=pk)
     if not can_generate_permit_docx(permit, request.user):
         messages.error(request, "DOCX generation is not allowed for this permit status.")
         return HttpResponseForbidden("DOCX generation is not allowed.")
 
-    template = (
-        DocumentTemplate.objects.filter(document_type="permit", is_active=True)
-        .order_by("-created_at", "-id")
-        .first()
-    )
+    template_id = request.POST.get("template_id")
+    template = get_selected_permit_template(template_id)
     if template is None:
+        if template_id:
+            messages.error(request, "Selected DOCX template is not active or is not available.")
+            return HttpResponseForbidden("Selected DOCX template is not available.")
         messages.error(request, "No active DOCX template for permit documents is configured.")
         return redirect("permits:detail", pk=permit.pk)
 
@@ -277,6 +280,22 @@ def download_generated_document(request, pk):
         as_attachment=True,
         filename=generated_document.file_docx.name.rsplit("/", 1)[-1],
     )
+
+
+def get_active_permit_templates():
+    """Return active permit DOCX templates in default selection order."""
+    return DocumentTemplate.objects.filter(document_type="permit", is_active=True).order_by(
+        "-created_at",
+        "-id",
+    )
+
+
+def get_selected_permit_template(template_id):
+    """Return a selected active permit template, or fallback to the latest active one."""
+    active_templates = get_active_permit_templates()
+    if not template_id:
+        return active_templates.first()
+    return active_templates.filter(pk=template_id).first()
 
 
 def can_generate_permit_docx(permit, user):
