@@ -2,16 +2,24 @@
 
 from datetime import timedelta
 from io import BytesIO
+from pathlib import Path
 from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
+from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 from django.utils import timezone
 from docx import Document
 
 from documents.models import DocumentTemplate, GeneratedDocument
-from documents.services import _build_permit_context, generate_permit_docx
+from documents.services import (
+    PdfConversionError,
+    _build_permit_context,
+    convert_docx_to_pdf,
+    generate_permit_docx,
+)
 from permits.models import Equipment, Hazard, Permit, SafetyMeasure, WorkArea, WorkType
 
 
@@ -107,6 +115,42 @@ class GeneratePermitDocxTests(TestCase):
         self.assertEqual(context["safety_measure_names"], ["PPE"])
         self.assertEqual(context["safety_measure_names_text"], "PPE")
 
+    @override_settings(PDF_CONVERTER_ENABLED=False)
+    def test_convert_docx_to_pdf_reports_disabled_converter(self):
+        generated_document = self._generated_document_with_docx()
+
+        with self.assertRaisesMessage(PdfConversionError, "PDF conversion is disabled"):
+            convert_docx_to_pdf(generated_document.pk)
+
+    @override_settings(PDF_CONVERTER_ENABLED=True, SOFFICE_PATH="missing-soffice")
+    @patch("documents.services.shutil.which", return_value=None)
+    def test_convert_docx_to_pdf_reports_missing_soffice(self, _which):
+        generated_document = self._generated_document_with_docx()
+
+        with self.assertRaisesMessage(PdfConversionError, "LibreOffice/soffice executable was not found"):
+            convert_docx_to_pdf(generated_document.pk)
+
+    @override_settings(PDF_CONVERTER_ENABLED=True, SOFFICE_PATH="soffice")
+    @patch("documents.services.shutil.which", return_value="/usr/bin/soffice")
+    @patch("documents.services.subprocess.run")
+    def test_convert_docx_to_pdf_saves_pdf_with_mocked_soffice(self, run_mock, _which):
+        generated_document = self._generated_document_with_docx()
+
+        def fake_run(command, **_kwargs):
+            output_dir = Path(command[command.index("--outdir") + 1])
+            docx_path = Path(command[-1])
+            output_dir.joinpath(f"{docx_path.stem}.pdf").write_bytes(b"%PDF-1.4 demo")
+
+        run_mock.side_effect = fake_run
+
+        converted_document = convert_docx_to_pdf(generated_document.pk)
+
+        self.assertEqual(converted_document.pk, generated_document.pk)
+        self.assertTrue(converted_document.file_pdf.name.endswith(".pdf"))
+        with converted_document.file_pdf.open("rb") as pdf_file:
+            self.assertEqual(pdf_file.read(), b"%PDF-1.4 demo")
+        run_mock.assert_called_once()
+
     def _template_bytes(self):
         document = Document()
         document.add_paragraph("Permit {{ permit.number }}")
@@ -121,3 +165,16 @@ class GeneratePermitDocxTests(TestCase):
         output = BytesIO()
         document.save(output)
         return output.getvalue()
+
+    def _generated_document_with_docx(self):
+        generated_document = GeneratedDocument.objects.create(
+            permit=self.permit,
+            template=self.template,
+            generated_by=self.generator,
+        )
+        generated_document.file_docx.save(
+            "generated-test.docx",
+            ContentFile(b"demo docx"),
+            save=True,
+        )
+        return generated_document

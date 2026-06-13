@@ -93,6 +93,9 @@ USE_TZ = True
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
+PDF_CONVERTER_ENABLED = os.getenv("PDF_CONVERTER_ENABLED", "0") == "1"
+SOFFICE_PATH = os.getenv("SOFFICE_PATH", "soffice")
+
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 LOGIN_REDIRECT_URL = "permits:list"
 LOGOUT_REDIRECT_URL = "login"

@@ -1,7 +1,12 @@
 """Document generation services."""
 
 from io import BytesIO
+from pathlib import Path
+import shutil
+import subprocess
+from tempfile import TemporaryDirectory
 
+from django.conf import settings
 from django.core.files.base import ContentFile
 from django.db import transaction
 from django.utils import timezone
@@ -9,6 +14,10 @@ from docxtpl import DocxTemplate
 
 from documents.models import DocumentTemplate, GeneratedDocument
 from permits.models import Permit
+
+
+class PdfConversionError(RuntimeError):
+    """Raised when DOCX to PDF conversion cannot be completed safely."""
 
 
 @transaction.atomic
@@ -46,6 +55,59 @@ def generate_permit_docx(permit_id, template_id, user):
         save=False,
     )
     generated_document.save()
+    return generated_document
+
+
+def convert_docx_to_pdf(generated_document_id):
+    """Convert a generated DOCX to PDF when PDF conversion is explicitly enabled."""
+    if not settings.PDF_CONVERTER_ENABLED:
+        raise PdfConversionError("PDF conversion is disabled. Set PDF_CONVERTER_ENABLED=1 to enable it.")
+
+    soffice_path = shutil.which(settings.SOFFICE_PATH)
+    if not soffice_path:
+        raise PdfConversionError(
+            "LibreOffice/soffice executable was not found. Set SOFFICE_PATH to enable PDF conversion."
+        )
+
+    generated_document = GeneratedDocument.objects.get(pk=generated_document_id)
+    if not generated_document.file_docx:
+        raise PdfConversionError("Generated DOCX file is missing; PDF conversion cannot be started.")
+
+    docx_path = Path(generated_document.file_docx.path)
+    if not docx_path.exists():
+        raise PdfConversionError(f"Generated DOCX file does not exist: {docx_path}")
+
+    with TemporaryDirectory() as output_dir:
+        output_path = Path(output_dir) / f"{docx_path.stem}.pdf"
+        command = [
+            soffice_path,
+            "--headless",
+            "--convert-to",
+            "pdf",
+            "--outdir",
+            output_dir,
+            str(docx_path),
+        ]
+        try:
+            subprocess.run(
+                command,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+        except subprocess.CalledProcessError as exc:
+            raise PdfConversionError(
+                f"PDF conversion failed: {exc.stderr or exc.stdout or exc}"
+            ) from exc
+
+        if not output_path.exists():
+            raise PdfConversionError("PDF conversion finished but no PDF file was produced.")
+
+        generated_document.file_pdf.save(
+            _generated_pdf_name(generated_document),
+            ContentFile(output_path.read_bytes()),
+            save=True,
+        )
     return generated_document
 
 
@@ -90,3 +152,8 @@ def _build_permit_context(permit):
 def _generated_docx_name(permit, template):
     timestamp = timezone.now().strftime("%Y%m%d%H%M%S")
     return f"permit_{permit.number}_template_{template.pk}_{timestamp}.docx"
+
+
+def _generated_pdf_name(generated_document):
+    docx_name = Path(generated_document.file_docx.name).stem
+    return f"{docx_name}.pdf"
