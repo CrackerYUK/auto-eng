@@ -1,0 +1,1 @@
+"""Permit system Django project."""
