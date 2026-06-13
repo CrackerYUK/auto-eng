@@ -6,11 +6,12 @@ from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied, ValidationError
+from django.db.models import Count
 from django.http import FileResponse, Http404, HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect
-from django.urls import reverse_lazy
+from django.urls import reverse, reverse_lazy
 from django.views.decorators.http import require_POST
-from django.views.generic import CreateView, DetailView, ListView, UpdateView
+from django.views.generic import CreateView, DetailView, ListView, TemplateView, UpdateView
 
 from approvals.models import ApprovalAction
 from audit.models import AuditLog
@@ -33,7 +34,7 @@ from documents.models import DocumentTemplate, GeneratedDocument
 from documents.services import generate_permit_docx
 from permits.forms import PermitForm
 from permits.models import Permit, PermitStatus
-from users.roles import ROLE_CHIEF, ROLE_OPERATOR
+from users.roles import ROLE_CHIEF, ROLE_MASTER, ROLE_OPERATOR
 
 
 ACTION_HANDLERS = {
@@ -56,6 +57,75 @@ ACTION_LABELS = {
 
 EDITABLE_STATUSES = {PermitStatus.DRAFT, PermitStatus.RETURNED}
 DOCX_GENERATION_STATUSES = {PermitStatus.APPROVED_BY_CHIEF, PermitStatus.CLOSED}
+PENDING_STATUSES_BY_ROLE = {
+    ROLE_OPERATOR: PermitStatus.RETURNED,
+    ROLE_MASTER: PermitStatus.SUBMITTED,
+    ROLE_CHIEF: PermitStatus.APPROVED_BY_MASTER,
+}
+
+
+class DashboardView(LoginRequiredMixin, TemplateView):
+    """Display permit counts, recent permits and current-user pending work."""
+
+    template_name = "dashboard.html"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        status_counts = {status: 0 for status in PermitStatus.values}
+        status_counts.update(
+            {
+                row["status"]: row["count"]
+                for row in Permit.objects.values("status").annotate(count=Count("id"))
+            }
+        )
+        pending_statuses = [
+            status
+            for role_name, status in PENDING_STATUSES_BY_ROLE.items()
+            if self.request.user.groups.filter(name=role_name).exists()
+        ]
+        pending_permits = Permit.objects.none()
+        if pending_statuses:
+            pending_permits = Permit.objects.filter(status__in=pending_statuses)
+
+        context["status_counts"] = [
+            {"status": status, "label": label, "count": status_counts[status]}
+            for status, label in PermitStatus.choices
+        ]
+        context["recent_permits"] = Permit.objects.select_related(
+            "created_by",
+            "work_area",
+            "equipment",
+            "work_type",
+        )[:10]
+        context["pending_permits"] = pending_permits.select_related(
+            "created_by",
+            "work_area",
+            "equipment",
+            "work_type",
+        )[:10]
+        context["quick_links"] = self._quick_links()
+        return context
+
+    def _quick_links(self):
+        links = [
+            {"label": "Создать наряд", "url": reverse("permits:create")},
+            {"label": "Список нарядов", "url": reverse("permits:list")},
+        ]
+        if _is_staff_or_admin(self.request.user):
+            links.extend(
+                [
+                    {
+                        "label": "Шаблоны DOCX",
+                        "url": reverse("admin:documents_documenttemplate_changelist"),
+                    },
+                    {
+                        "label": "Справочники",
+                        "url": reverse("admin:permits_workarea_changelist"),
+                    },
+                    {"label": "Админка", "url": reverse("admin:index")},
+                ]
+            )
+        return links
 
 
 class PermitListView(LoginRequiredMixin, ListView):

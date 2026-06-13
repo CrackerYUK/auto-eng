@@ -7,6 +7,7 @@ from permits import views
 app_name = "permits"
 
 urlpatterns = [
+    path("dashboard/", views.DashboardView.as_view(), name="dashboard"),
     path("", views.PermitListView.as_view(), name="list"),
     path("new/", views.PermitCreateView.as_view(), name="create"),
     path("<int:pk>/", views.PermitDetailView.as_view(), name="detail"),

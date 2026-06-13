@@ -111,6 +111,67 @@ class PermitViewTests(TestCase):
         self.assertContains(response, permit.work_location)
         self.assertContains(response, reverse("permits:detail", kwargs={"pk": permit.pk}))
 
+    def test_dashboard_page_available_for_authenticated_user(self):
+        permit = self.make_permit(number="PT-DASHBOARD-RECENT", status=PermitStatus.DRAFT)
+
+        response = self.client.get(reverse("permits:dashboard"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Dashboard")
+        self.assertContains(response, "Permit counts by status")
+        self.assertContains(response, "Latest permits")
+        self.assertContains(response, permit.number)
+        self.assertContains(response, "Создать наряд")
+        self.assertContains(response, "Список нарядов")
+
+    def test_dashboard_redirects_anonymous_user_to_login(self):
+        self.client.logout()
+
+        response = self.client.get(reverse("permits:dashboard"))
+
+        self.assertRedirects(
+            response,
+            f"{reverse('login')}?next={reverse('permits:dashboard')}",
+        )
+
+    def test_dashboard_operator_sees_returned_permits_waiting_for_action(self):
+        returned = self.make_permit(number="PT-DASHBOARD-RETURNED", status=PermitStatus.RETURNED)
+        submitted = self.make_permit(number="PT-DASHBOARD-SUBMITTED", status=PermitStatus.SUBMITTED)
+
+        response = self.client.get(reverse("permits:dashboard"))
+
+        self.assertEqual(response.status_code, 200)
+        pending_permits = list(response.context["pending_permits"])
+        self.assertIn(returned, pending_permits)
+        self.assertNotIn(submitted, pending_permits)
+
+    def test_dashboard_master_sees_submitted_permits_waiting_for_action(self):
+        self.client.force_login(self.master)
+        submitted = self.make_permit(number="PT-DASHBOARD-MASTER", status=PermitStatus.SUBMITTED)
+        returned = self.make_permit(number="PT-DASHBOARD-OPERATOR", status=PermitStatus.RETURNED)
+
+        response = self.client.get(reverse("permits:dashboard"))
+
+        self.assertEqual(response.status_code, 200)
+        pending_permits = list(response.context["pending_permits"])
+        self.assertIn(submitted, pending_permits)
+        self.assertNotIn(returned, pending_permits)
+
+    def test_dashboard_chief_sees_master_approved_permits_waiting_for_action(self):
+        self.client.force_login(self.chief)
+        master_approved = self.make_permit(
+            number="PT-DASHBOARD-CHIEF",
+            status=PermitStatus.APPROVED_BY_MASTER,
+        )
+        submitted = self.make_permit(number="PT-DASHBOARD-MASTER-ONLY", status=PermitStatus.SUBMITTED)
+
+        response = self.client.get(reverse("permits:dashboard"))
+
+        self.assertEqual(response.status_code, 200)
+        pending_permits = list(response.context["pending_permits"])
+        self.assertIn(master_approved, pending_permits)
+        self.assertNotIn(submitted, pending_permits)
+
     def test_permit_detail_page_shows_core_sections(self):
         permit = self.make_permit()
         action = ApprovalAction.objects.create(

@@ -18,8 +18,12 @@
 </head>
 <body>
 <header>
-    <h1><a href="{% url 'permits:list' %}">permit-system</a></h1>
-    <nav><a href="{% url 'permits:create' %}">Create permit</a></nav>
+    <h1><a href="{% url 'permits:dashboard' %}">permit-system</a></h1>
+    <nav>
+        <a href="{% url 'permits:dashboard' %}">Dashboard</a>
+        <a href="{% url 'permits:list' %}">Permits</a>
+        <a href="{% url 'permits:create' %}">Create permit</a>
+    </nav>
 </header>
 {% if messages %}
 <ul class="messages">
