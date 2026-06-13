@@ -122,7 +122,13 @@ docker compose run --rm web python manage.py setup_roles
 
 ## Demo setup
 
-Для локальной демонстрации можно создать непроизводственные тестовые данные командой:
+Для локальной демонстрации сначала примените миграции:
+
+```bash
+python manage.py migrate
+```
+
+Затем создайте непроизводственные тестовые данные командой:
 
 ```bash
 python manage.py seed_demo_data
@@ -131,6 +137,7 @@ python manage.py seed_demo_data
 При запуске через Docker Compose используйте:
 
 ```bash
+docker compose run --rm web python manage.py migrate
 docker compose run --rm web python manage.py seed_demo_data
 ```
 
@@ -146,6 +153,13 @@ docker compose run --rm web python manage.py seed_demo_data
 ```text
 demo12345
 ```
+
+Логины demo-пользователей совпадают с именами пользователей:
+
+- `operator`;
+- `master`;
+- `chief`;
+- `admin`.
 
 Эти данные предназначены только для локальной демонстрации и не должны использоваться как производственные данные.
 
