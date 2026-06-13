@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load permit_status %}
 
 {% block title %}Permit {{ permit.number }}{% endblock %}
 
@@ -8,7 +9,7 @@
 <section>
     <h3>Main fields</h3>
     <dl>
-        <dt>Status</dt><dd>{{ permit.get_status_display }}</dd>
+        <dt>Status</dt><dd><span class="{{ permit.status|permit_status_badge_class }}">{{ permit.status|permit_status_label }}</span></dd>
         <dt>Created at</dt><dd>{{ permit.created_at }}</dd>
         <dt>Work starts at</dt><dd>{{ permit.work_starts_at }}</dd>
         <dt>Work ends at</dt><dd>{{ permit.work_ends_at }}</dd>

@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load permit_status %}
 
 {% block title %}Permits{% endblock %}
 
@@ -21,7 +22,7 @@
     {% for permit in permits %}
     <tr>
         <td>{{ permit.number }}</td>
-        <td>{{ permit.get_status_display }}</td>
+        <td><span class="{{ permit.status|permit_status_badge_class }}">{{ permit.status|permit_status_label }}</span></td>
         <td>{{ permit.work_location }}</td>
         <td>{{ permit.work_starts_at }}</td>
         <td>{{ permit.work_ends_at }}</td>

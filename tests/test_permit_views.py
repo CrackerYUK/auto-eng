@@ -109,6 +109,7 @@ class PermitViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, permit.number)
         self.assertContains(response, permit.work_location)
+        self.assertContains(response, "status-badge status-draft")
         self.assertContains(response, reverse("permits:detail", kwargs={"pk": permit.pk}))
 
     def test_dashboard_page_available_for_authenticated_user(self):
@@ -121,6 +122,7 @@ class PermitViewTests(TestCase):
         self.assertContains(response, "Permit counts by status")
         self.assertContains(response, "Latest permits")
         self.assertContains(response, permit.number)
+        self.assertContains(response, "status-badge status-draft")
         self.assertContains(response, "Создать наряд")
         self.assertContains(response, "Список нарядов")
 
@@ -216,6 +218,7 @@ class PermitViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Main fields")
         self.assertContains(response, permit.number)
+        self.assertContains(response, "status-badge status-draft")
         self.assertContains(response, action.comment)
         self.assertContains(response, document.file_docx.name)
         self.assertContains(response, "Permit change history")
