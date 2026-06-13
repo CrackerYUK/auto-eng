@@ -4,6 +4,16 @@
 
 {% block content %}
 <h2>Permits</h2>
+
+<form method="get" class="filters">
+    <fieldset>
+        <legend>Filters</legend>
+        {{ filter_form.as_p }}
+        <button type="submit">Apply filters</button>
+        <a href="{% url 'permits:list' %}">Сбросить фильтры</a>
+    </fieldset>
+</form>
+
 <table>
     <thead>
     <tr>

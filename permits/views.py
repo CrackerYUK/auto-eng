@@ -3,9 +3,11 @@
 from datetime import timezone as datetime_timezone
 
 from django.contrib import messages
+from django.contrib.auth import get_user_model
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied, ValidationError
+from django.db.models import Q
 from django.http import FileResponse, Http404, HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse_lazy
@@ -31,7 +33,7 @@ from approvals.services import (
 )
 from documents.models import DocumentTemplate, GeneratedDocument
 from documents.services import generate_permit_docx
-from permits.forms import PermitForm
+from permits.forms import PermitFilterForm, PermitForm
 from permits.models import Permit, PermitStatus
 from users.roles import ROLE_CHIEF, ROLE_OPERATOR
 
@@ -59,13 +61,62 @@ DOCX_GENERATION_STATUSES = {PermitStatus.APPROVED_BY_CHIEF, PermitStatus.CLOSED}
 
 
 class PermitListView(LoginRequiredMixin, ListView):
-    """Display a table with permits."""
+    """Display a filterable table with permits."""
 
     model = Permit
     template_name = "permits/permit_list.html"
     context_object_name = "permits"
     paginate_by = 50
-    queryset = Permit.objects.select_related("created_by")
+
+    def get_filter_form(self):
+        return PermitFilterForm(
+            self.request.GET or None,
+            user_queryset=get_user_model().objects.order_by("username"),
+        )
+
+    def get_queryset(self):
+        queryset = Permit.objects.select_related(
+            "created_by",
+            "work_area",
+            "equipment",
+            "work_type",
+        )
+        self.filter_form = self.get_filter_form()
+        if not self.filter_form.is_valid():
+            return queryset
+
+        filters = self.filter_form.cleaned_data
+        if filters["status"]:
+            queryset = queryset.filter(status=filters["status"])
+        if filters["work_area"]:
+            queryset = queryset.filter(work_area=filters["work_area"])
+        if filters["equipment"]:
+            queryset = queryset.filter(equipment=filters["equipment"])
+        if filters["work_type"]:
+            queryset = queryset.filter(work_type=filters["work_type"])
+        if filters["work_starts_from"]:
+            queryset = queryset.filter(work_starts_at__date__gte=filters["work_starts_from"])
+        if filters["work_starts_to"]:
+            queryset = queryset.filter(work_starts_at__date__lte=filters["work_starts_to"])
+        if filters["created_from"]:
+            queryset = queryset.filter(created_at__date__gte=filters["created_from"])
+        if filters["created_to"]:
+            queryset = queryset.filter(created_at__date__lte=filters["created_to"])
+        if filters["created_by"]:
+            queryset = queryset.filter(created_by=filters["created_by"])
+        if filters["q"]:
+            query = filters["q"]
+            queryset = queryset.filter(
+                Q(number__icontains=query)
+                | Q(work_location__icontains=query)
+                | Q(work_description__icontains=query)
+            )
+        return queryset
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["filter_form"] = getattr(self, "filter_form", self.get_filter_form())
+        return context
 
 
 class PermitDetailView(LoginRequiredMixin, DetailView):

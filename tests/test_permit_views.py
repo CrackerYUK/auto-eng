@@ -111,6 +111,113 @@ class PermitViewTests(TestCase):
         self.assertContains(response, permit.work_location)
         self.assertContains(response, reverse("permits:detail", kwargs={"pk": permit.pk}))
 
+    def test_permit_list_filters_by_status_references_dates_author_and_search(self):
+        other_area = WorkArea.objects.create(name="Boiler house")
+        other_equipment = Equipment.objects.create(
+            name="Boiler Pump",
+            code="B-200",
+            work_area=other_area,
+        )
+        other_work_type = WorkType.objects.create(name="Repair")
+        other_author = get_user_model().objects.create_user(username="other-author", password="pass")
+        target_start = timezone.now() + timedelta(days=3)
+        other_start = timezone.now() + timedelta(days=10)
+        target = Permit.objects.create(
+            number="PT-FILTER-TARGET",
+            status=PermitStatus.SUBMITTED,
+            work_starts_at=target_start,
+            work_ends_at=target_start + timedelta(hours=6),
+            work_location="Boiler room",
+            work_area=other_area,
+            equipment=other_equipment,
+            work_type=other_work_type,
+            work_description="Replace boiler gasket",
+            responsible_manager=self.manager,
+            work_supervisor=self.supervisor,
+            created_by=other_author,
+        )
+        decoy = Permit.objects.create(
+            number="PT-FILTER-DECOY",
+            status=PermitStatus.DRAFT,
+            work_starts_at=other_start,
+            work_ends_at=other_start + timedelta(hours=6),
+            work_location="Workshop 1",
+            work_area=self.work_area,
+            equipment=self.equipment,
+            work_type=self.work_type,
+            work_description="Inspect pump",
+            responsible_manager=self.manager,
+            work_supervisor=self.supervisor,
+            created_by=self.operator,
+        )
+        created_date = timezone.localdate(target.created_at).isoformat()
+        work_date = timezone.localdate(target.work_starts_at).isoformat()
+
+        response = self.client.get(
+            reverse("permits:list"),
+            data={
+                "status": PermitStatus.SUBMITTED,
+                "work_area": other_area.pk,
+                "equipment": other_equipment.pk,
+                "work_type": other_work_type.pk,
+                "work_starts_from": work_date,
+                "work_starts_to": work_date,
+                "created_from": created_date,
+                "created_to": created_date,
+                "created_by": other_author.pk,
+                "q": "boiler gasket",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, target.number)
+        self.assertNotContains(response, decoy.number)
+        self.assertContains(response, 'name="q"')
+        self.assertContains(response, 'value="boiler gasket"')
+        self.assertContains(response, "Сбросить фильтры")
+
+    def test_permit_list_text_search_matches_number_location_and_description(self):
+        by_number = self.make_permit(number="PT-SEARCH-NUMBER")
+        by_location = Permit.objects.create(
+            number="PT-SEARCH-LOCATION",
+            status=PermitStatus.DRAFT,
+            work_starts_at=timezone.now() + timedelta(days=4),
+            work_ends_at=timezone.now() + timedelta(days=4, hours=4),
+            work_location="Tank farm",
+            work_area=self.work_area,
+            equipment=self.equipment,
+            work_type=self.work_type,
+            work_description="Inspect equipment",
+            responsible_manager=self.manager,
+            work_supervisor=self.supervisor,
+            created_by=self.operator,
+        )
+        by_description = Permit.objects.create(
+            number="PT-SEARCH-DESCRIPTION",
+            status=PermitStatus.DRAFT,
+            work_starts_at=timezone.now() + timedelta(days=5),
+            work_ends_at=timezone.now() + timedelta(days=5, hours=4),
+            work_location="Workshop 2",
+            work_area=self.work_area,
+            equipment=self.equipment,
+            work_type=self.work_type,
+            work_description="Calibrate safety valve",
+            responsible_manager=self.manager,
+            work_supervisor=self.supervisor,
+            created_by=self.operator,
+        )
+
+        response_by_number = self.client.get(reverse("permits:list"), data={"q": "SEARCH-NUMBER"})
+        response_by_location = self.client.get(reverse("permits:list"), data={"q": "Tank farm"})
+        response_by_description = self.client.get(reverse("permits:list"), data={"q": "safety valve"})
+
+        self.assertContains(response_by_number, by_number.number)
+        self.assertNotContains(response_by_number, by_location.number)
+        self.assertContains(response_by_location, by_location.number)
+        self.assertNotContains(response_by_location, by_description.number)
+        self.assertContains(response_by_description, by_description.number)
+        self.assertNotContains(response_by_description, by_number.number)
+
     def test_permit_detail_page_shows_core_sections(self):
         permit = self.make_permit()
         action = ApprovalAction.objects.create(
