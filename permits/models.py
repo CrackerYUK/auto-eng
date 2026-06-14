@@ -258,9 +258,12 @@ class PermitParticipant(models.Model):
 
     def display_name(self):
         if self.personnel_id:
-            name = self.personnel.full_name
+            name_parts = [self.personnel.full_name]
             if self.personnel.position:
-                name = f"{name} — {self.personnel.position}"
+                name_parts.append(self.personnel.position)
+            if self.personnel.group_id:
+                name_parts.append(self.personnel.group.name)
+            name = " — ".join(name_parts)
         else:
             name = (self.manual_name or "").strip()
         if self.note:

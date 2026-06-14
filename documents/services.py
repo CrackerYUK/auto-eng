@@ -249,15 +249,7 @@ def _build_participant_context(permit, responsible_manager_fallback="", work_pro
 
 
 def _format_participant(participant):
-    if participant.personnel_id:
-        value = participant.personnel.full_name
-        if participant.personnel.position:
-            value = f"{value} — {participant.personnel.position}"
-    else:
-        value = participant.manual_name.strip()
-    if participant.note:
-        value = f"{value} ({participant.note})"
-    return value
+    return participant.display_name()
 
 
 def _build_demo_template_context(template):

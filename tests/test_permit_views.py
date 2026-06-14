@@ -371,6 +371,78 @@ class PermitViewTests(TestCase):
         self.assertEqual(permit.work_nature_text, "Updated manual work nature")
         self.assertEqual(permit.participants.count(), 2)
 
+    def test_edit_permit_page_updates_and_deletes_participants(self):
+        permit = self.make_permit()
+        responsible = PermitParticipant.objects.create(
+            permit=permit,
+            role=PermitParticipantRole.RESPONSIBLE_MANAGER,
+            personnel=self.personnel_manager,
+            note="old note",
+            sort_order=1,
+        )
+        performer = PermitParticipant.objects.create(
+            permit=permit,
+            role=PermitParticipantRole.PERFORMER,
+            manual_name="Old performer",
+            sort_order=2,
+        )
+        data = self.permit_form_data(number=permit.number)
+        data.update(
+            {
+                "participants-TOTAL_FORMS": "2",
+                "participants-INITIAL_FORMS": "2",
+                "participants-0-id": responsible.pk,
+                "participants-0-role": PermitParticipantRole.RESPONSIBLE_MANAGER,
+                "participants-0-personnel": self.personnel_manager.pk,
+                "participants-0-manual_name": "",
+                "participants-0-note": "updated note",
+                "participants-0-sort_order": "1",
+                "participants-1-id": performer.pk,
+                "participants-1-role": PermitParticipantRole.PERFORMER,
+                "participants-1-personnel": "",
+                "participants-1-manual_name": "Old performer",
+                "participants-1-note": "",
+                "participants-1-sort_order": "2",
+                "participants-1-DELETE": "on",
+            }
+        )
+
+        response = self.client.post(reverse("permits:edit", kwargs={"pk": permit.pk}), data=data)
+
+        self.assertRedirects(response, reverse("permits:detail", kwargs={"pk": permit.pk}))
+        responsible.refresh_from_db()
+        self.assertEqual(responsible.note, "updated note")
+        self.assertFalse(PermitParticipant.objects.filter(pk=performer.pk).exists())
+
+    def test_invalid_permit_form_does_not_save_participants(self):
+        data = self.permit_form_data(number="")
+
+        response = self.client.post(reverse("permits:create"), data=data)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(Permit.objects.filter(work_location="Pump station").exists())
+        self.assertFalse(PermitParticipant.objects.filter(manual_name="Manual performer").exists())
+
+    def test_empty_participant_formset_row_is_ignored(self):
+        data = self.permit_form_data(number="PT-WEB-EMPTY-PARTICIPANT")
+        data.update(
+            {
+                "participants-TOTAL_FORMS": "1",
+                "participants-INITIAL_FORMS": "0",
+                "participants-0-role": PermitParticipantRole.PERFORMER,
+                "participants-0-personnel": "",
+                "participants-0-manual_name": "",
+                "participants-0-note": "",
+                "participants-0-sort_order": "0",
+            }
+        )
+
+        response = self.client.post(reverse("permits:create"), data=data)
+
+        permit = Permit.objects.get(number="PT-WEB-EMPTY-PARTICIPANT")
+        self.assertRedirects(response, reverse("permits:detail", kwargs={"pk": permit.pk}))
+        self.assertEqual(permit.participants.count(), 0)
+
     def test_edit_permit_page_writes_changed_fields_audit_log(self):
         permit = self.make_permit(number="PT-WEB-AUDIT-EDIT")
         data = self.permit_form_data(number=permit.number)

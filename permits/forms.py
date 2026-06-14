@@ -1,6 +1,7 @@
 """Forms for permit create and edit pages."""
 
 from django import forms
+from django.db.models import Q
 from django.forms import inlineformset_factory
 
 from permits.models import (
@@ -93,7 +94,10 @@ class PermitParticipantForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["personnel"].queryset = Personnel.objects.filter(is_active=True).select_related(
+        personnel_filter = Q(is_active=True)
+        if self.instance and self.instance.personnel_id:
+            personnel_filter |= Q(pk=self.instance.personnel_id)
+        self.fields["personnel"].queryset = Personnel.objects.filter(personnel_filter).select_related(
             "group",
             "work_area",
         )

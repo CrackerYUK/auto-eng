@@ -1,9 +1,24 @@
 """Tests for permit forms."""
 
+from datetime import timedelta
+
+from django.contrib.auth import get_user_model
 from django.test import TestCase
+from django.utils import timezone
 
 from permits.forms import PermitForm, PermitParticipantForm
-from permits.models import Equipment, Hazard, Personnel, PersonnelGroup, SafetyMeasure, WorkArea, WorkType
+from permits.models import (
+    Equipment,
+    Hazard,
+    Permit,
+    PermitParticipant,
+    PermitParticipantRole,
+    Personnel,
+    PersonnelGroup,
+    SafetyMeasure,
+    WorkArea,
+    WorkType,
+)
 
 
 class PermitFormTests(TestCase):
@@ -61,9 +76,21 @@ class PermitFormTests(TestCase):
 class PermitParticipantFormTests(TestCase):
     """Checks personnel selection in participant forms."""
 
+    @classmethod
+    def setUpTestData(cls):
+        cls.work_area = WorkArea.objects.create(name="Participant form area")
+        cls.group = PersonnelGroup.objects.create(name="Мастера")
+        cls.personnel = Personnel.objects.create(
+            full_name="Иванов Иван Иванович",
+            personnel_number="P-001",
+            position="мастер",
+            group=cls.group,
+            work_area=cls.work_area,
+        )
+
     def test_participant_form_uses_only_active_personnel_with_context_label(self):
         work_area = WorkArea.objects.create(name="Area for personnel")
-        group = PersonnelGroup.objects.create(name="Мастера")
+        group = PersonnelGroup.objects.create(name="Мастера формы")
         active = Personnel.objects.create(
             full_name="Иванов Иван Иванович",
             personnel_number="P-001",
@@ -86,5 +113,96 @@ class PermitParticipantFormTests(TestCase):
         label = form.fields["personnel"].label_from_instance(active)
         self.assertIn("Иванов Иван Иванович", label)
         self.assertIn("мастер", label)
-        self.assertIn("Мастера", label)
+        self.assertIn("Мастера формы", label)
         self.assertIn("Area for personnel", label)
+
+    def test_participant_form_keeps_existing_inactive_personnel_selectable(self):
+        user_model = get_user_model()
+        creator = user_model.objects.create_user(username="creator")
+        manager = user_model.objects.create_user(username="manager")
+        supervisor = user_model.objects.create_user(username="supervisor")
+        work_area = WorkArea.objects.create(name="Inactive personnel area")
+        group = PersonnelGroup.objects.create(name="Архивные работники")
+        work_type = WorkType.objects.create(name="Repair")
+        inactive = Personnel.objects.create(
+            full_name="Архивный работник",
+            position="мастер",
+            group=group,
+            work_area=work_area,
+            is_active=False,
+        )
+        starts_at = timezone.now() + timedelta(days=1)
+        permit = Permit.objects.create(
+            number="PT-INACTIVE-PERSONNEL",
+            work_starts_at=starts_at,
+            work_ends_at=starts_at + timedelta(hours=2),
+            work_location="Workshop",
+            work_area=work_area,
+            work_type=work_type,
+            work_description="Repair",
+            responsible_manager=manager,
+            work_supervisor=supervisor,
+            created_by=creator,
+        )
+        participant = PermitParticipant.objects.create(
+            permit=permit,
+            personnel=inactive,
+        )
+
+        form = PermitParticipantForm(instance=participant)
+
+        self.assertIn(inactive, form.fields["personnel"].queryset)
+
+    def test_participant_form_accepts_personnel_without_manual_name(self):
+        form = PermitParticipantForm(
+            data={
+                "role": PermitParticipantRole.RESPONSIBLE_MANAGER,
+                "personnel": self.personnel.pk,
+                "manual_name": "",
+                "note": "",
+                "sort_order": "1",
+            }
+        )
+
+        self.assertTrue(form.is_valid(), form.errors)
+
+    def test_participant_form_accepts_manual_name_without_personnel(self):
+        form = PermitParticipantForm(
+            data={
+                "role": PermitParticipantRole.OTHER,
+                "personnel": "",
+                "manual_name": "Ручной участник",
+                "note": "",
+                "sort_order": "1",
+            }
+        )
+
+        self.assertTrue(form.is_valid(), form.errors)
+
+    def test_participant_form_rejects_missing_personnel_and_manual_name(self):
+        form = PermitParticipantForm(
+            data={
+                "role": PermitParticipantRole.PERFORMER,
+                "personnel": "",
+                "manual_name": "",
+                "note": "",
+                "sort_order": "1",
+            }
+        )
+
+        self.assertFalse(form.is_valid())
+        self.assertIn("__all__", form.errors)
+
+    def test_participant_form_requires_role(self):
+        form = PermitParticipantForm(
+            data={
+                "role": "",
+                "personnel": self.personnel.pk,
+                "manual_name": "",
+                "note": "",
+                "sort_order": "1",
+            }
+        )
+
+        self.assertFalse(form.is_valid())
+        self.assertIn("role", form.errors)

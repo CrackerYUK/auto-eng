@@ -155,6 +155,7 @@ class PermitSystemModelTests(TestCase):
         self.assertEqual(self.permit.work_type, self.work_type)
         self.assertIn(self.hazard, self.permit.hazards.all())
         self.assertIn(self.safety_measure, self.permit.safety_measures.all())
+
     def test_personnel_group_and_personnel_are_not_users(self):
         group = PersonnelGroup.objects.create(name="Мастера")
         worker = Personnel.objects.create(
@@ -189,7 +190,7 @@ class PermitSystemModelTests(TestCase):
             note="ручной ввод",
         )
 
-        self.assertIn("Петров Пётр Петрович", participant_with_personnel.display_name())
+        self.assertEqual(participant_with_personnel.display_name(), "Петров Пётр Петрович — слесарь — Слесари")
         self.assertEqual(manual_participant.display_name(), "Представитель подрядчика (ручной ввод)")
 
     def test_permit_participant_requires_personnel_or_manual_name(self):
