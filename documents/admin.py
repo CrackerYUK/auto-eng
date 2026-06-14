@@ -2,11 +2,13 @@
 
 from django.contrib import admin
 
+from .forms import DocumentTemplateAdminForm
 from .models import DocumentTemplate, GeneratedDocument
 
 
 @admin.register(DocumentTemplate)
 class DocumentTemplateAdmin(admin.ModelAdmin):
+    form = DocumentTemplateAdminForm
     list_display = ("name", "document_type", "version", "is_active", "uploaded_by", "created_at")
     list_filter = ("document_type", "is_active", "created_at")
     search_fields = ("name", "document_type", "version")
