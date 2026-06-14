@@ -135,7 +135,12 @@ class PermitListView(LoginRequiredMixin, ListView):
     template_name = "permits/permit_list.html"
     context_object_name = "permits"
     paginate_by = 50
-    queryset = Permit.objects.select_related("created_by")
+    queryset = Permit.objects.select_related(
+        "created_by",
+        "work_area",
+        "equipment",
+        "work_type",
+    )
 
 
 class PermitDetailView(LoginRequiredMixin, DetailView):
@@ -148,6 +153,9 @@ class PermitDetailView(LoginRequiredMixin, DetailView):
         "responsible_manager",
         "work_supervisor",
         "created_by",
+        "work_area",
+        "equipment",
+        "work_type",
     )
 
     def get_context_data(self, **kwargs):

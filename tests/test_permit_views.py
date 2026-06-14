@@ -779,10 +779,13 @@ class PermitDocxGenerationViewTests(TestCase):
 
         response = self.client.get(reverse("permits:download_pdf", kwargs={"pk": generated_document.pk}))
 
-        self.assertEqual(response.status_code, 200)
-        self.assertIn("attachment", response["Content-Disposition"])
-        self.assertIn("permit.pdf", response["Content-Disposition"])
-        self.assertEqual(b"".join(response.streaming_content), b"%PDF download")
+        try:
+            self.assertEqual(response.status_code, 200)
+            self.assertIn("attachment", response["Content-Disposition"])
+            self.assertIn("permit.pdf", response["Content-Disposition"])
+            self.assertEqual(b"".join(response.streaming_content), b"%PDF download")
+        finally:
+            response.close()
 
     def test_unauthenticated_user_cannot_download_pdf(self):
         _permit, generated_document = self.create_generated_document_with_docx("PT-WEB-PDF-UNAUTH")
