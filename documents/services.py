@@ -38,7 +38,7 @@ def generate_permit_docx(permit_id, template_id, user):
     template = DocumentTemplate.objects.get(pk=template_id)
 
     docx_template = DocxTemplate(template.file.path)
-    docx_template.render(_build_permit_context(permit))
+    docx_template.render(_build_permit_context(permit, template))
 
     output = BytesIO()
     docx_template.save(output)
@@ -111,7 +111,17 @@ def convert_docx_to_pdf(generated_document_id):
     return generated_document
 
 
-def _build_permit_context(permit):
+def _build_permit_context(permit, template=None):
+    hazard_names = [hazard.name for hazard in permit.hazards.all()]
+    safety_measure_names = [measure.name for measure in permit.safety_measures.all()]
+    equipment_name = permit.equipment.name if permit.equipment else ""
+    equipment_code = permit.equipment.code if permit.equipment else ""
+    responsible_manager_name = _user_display_name(permit.responsible_manager)
+    work_supervisor_name = _user_display_name(permit.work_supervisor)
+    created_by_name = _user_display_name(permit.created_by)
+    template_name = template.name if template else ""
+    template_version = template.version if template else ""
+
     return {
         "permit": {
             "id": permit.pk,
@@ -125,28 +135,56 @@ def _build_permit_context(permit):
             "work_area": permit.work_area,
             "work_area_name": permit.work_area.name,
             "equipment": permit.equipment,
-            "equipment_name": permit.equipment.name if permit.equipment else "",
-            "equipment_code": permit.equipment.code if permit.equipment else "",
+            "equipment_name": equipment_name,
+            "equipment_code": equipment_code,
             "work_type": permit.work_type,
             "work_type_name": permit.work_type.name,
             "hazards": list(permit.hazards.all()),
-            "hazard_names": [hazard.name for hazard in permit.hazards.all()],
-            "hazard_names_text": ", ".join(hazard.name for hazard in permit.hazards.all()),
+            "hazard_names": hazard_names,
+            "hazard_names_text": ", ".join(hazard_names),
             "safety_measures": list(permit.safety_measures.all()),
-            "safety_measure_names": [measure.name for measure in permit.safety_measures.all()],
-            "safety_measure_names_text": ", ".join(
-                measure.name for measure in permit.safety_measures.all()
-            ),
+            "safety_measure_names": safety_measure_names,
+            "safety_measure_names_text": ", ".join(safety_measure_names),
             "work_description": permit.work_description,
             "responsible_manager": permit.responsible_manager,
-            "responsible_manager_name": permit.responsible_manager.get_username(),
+            "responsible_manager_name": responsible_manager_name,
             "work_supervisor": permit.work_supervisor,
-            "work_supervisor_name": permit.work_supervisor.get_username(),
+            "work_supervisor_name": work_supervisor_name,
             "created_by": permit.created_by,
-            "created_by_name": permit.created_by.get_username(),
+            "created_by_name": created_by_name,
             "updated_at": permit.updated_at,
-        }
+        },
+        "номер_наряда": permit.number or "",
+        "статус_наряда": permit.get_status_display() or "",
+        "участок": permit.work_area.name if permit.work_area else "",
+        "оборудование": equipment_name,
+        "вид_работ": permit.work_type.name if permit.work_type else "",
+        "место_работ": permit.work_location or "",
+        "описание_работ": permit.work_description or "",
+        "дата_начала": _format_docx_date(permit.work_starts_at),
+        "дата_окончания": _format_docx_date(permit.work_ends_at),
+        "дата_создания": _format_docx_date(permit.created_at),
+        "ответственный_руководитель": responsible_manager_name,
+        "производитель_работ": work_supervisor_name,
+        "создал_пользователь": created_by_name,
+        "опасности": ", ".join(hazard_names),
+        "меры_безопасности": ", ".join(safety_measure_names),
+        "шаблон_документа": template_name,
+        "версия_шаблона": template_version,
     }
+
+
+def _format_docx_date(value):
+    if not value:
+        return ""
+    return timezone.localtime(value).strftime("%d.%m.%Y")
+
+
+def _user_display_name(user):
+    if not user:
+        return ""
+    full_name = user.get_full_name().strip()
+    return full_name or user.get_username() or ""
 
 
 def _generated_docx_name(permit, template):
