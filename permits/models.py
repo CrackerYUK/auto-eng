@@ -91,6 +91,29 @@ class Permit(models.Model):
     work_starts_at = models.DateTimeField()
     work_ends_at = models.DateTimeField()
     work_location = models.CharField(max_length=255)
+    responsible_manager_text = models.CharField(
+        "responsible manager free-text value",
+        max_length=255,
+        blank=True,
+    )
+    work_producer_text = models.CharField(
+        "work producer free-text value",
+        max_length=255,
+        blank=True,
+    )
+    work_nature_text = models.CharField(
+        "work nature free-text value",
+        max_length=255,
+        blank=True,
+    )
+    additional_conditions = models.TextField(
+        "additional conditions",
+        blank=True,
+    )
+    additional_safety_notes = models.TextField(
+        "additional safety notes",
+        blank=True,
+    )
     work_area = models.ForeignKey(
         WorkArea,
         on_delete=models.PROTECT,

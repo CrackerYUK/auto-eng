@@ -1,0 +1,9 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+<div id="content-main">
+    <p><a href="{% url 'admin:documents_documenttemplate_changelist' %}">← К списку DOCX-шаблонов</a></p>
+    <h1>Ошибка проверки DOCX-шаблона</h1>
+    <p class="errornote">{{ message }}</p>
+</div>
+{% endblock %}

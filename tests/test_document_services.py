@@ -55,6 +55,11 @@ class GeneratePermitDocxTests(TestCase):
             work_starts_at=starts_at,
             work_ends_at=starts_at + timedelta(hours=8),
             work_location="Boiler room",
+            responsible_manager_text="Manual manager",
+            work_producer_text="Manual producer",
+            work_nature_text="Manual repair nature",
+            additional_conditions="Manual extra conditions",
+            additional_safety_notes="Manual extra safety notes",
             work_area=self.work_area,
             equipment=self.equipment,
             work_type=self.work_type,
@@ -112,8 +117,11 @@ class GeneratePermitDocxTests(TestCase):
         self.assertIn(f"Дата начала {timezone.localtime(self.permit.work_starts_at):%d.%m.%Y}", rendered_text)
         self.assertIn(f"Дата окончания {timezone.localtime(self.permit.work_ends_at):%d.%m.%Y}", rendered_text)
         self.assertIn(f"Дата создания {timezone.localtime(self.permit.created_at):%d.%m.%Y}", rendered_text)
-        self.assertIn("Ответственный manager", rendered_text)
-        self.assertIn("Производитель supervisor", rendered_text)
+        self.assertIn("Ответственный Manual manager", rendered_text)
+        self.assertIn("Производитель Manual producer", rendered_text)
+        self.assertIn("Характер Manual repair nature", rendered_text)
+        self.assertIn("Условия Manual extra conditions", rendered_text)
+        self.assertIn("Доп меры Manual extra safety notes", rendered_text)
         self.assertIn("Создал creator", rendered_text)
         self.assertIn("Опасности Steam", rendered_text)
         self.assertIn("Меры PPE", rendered_text)
@@ -145,8 +153,11 @@ class GeneratePermitDocxTests(TestCase):
         self.assertEqual(context["дата_начала"], timezone.localtime(self.permit.work_starts_at).strftime("%d.%m.%Y"))
         self.assertEqual(context["дата_окончания"], timezone.localtime(self.permit.work_ends_at).strftime("%d.%m.%Y"))
         self.assertEqual(context["дата_создания"], timezone.localtime(self.permit.created_at).strftime("%d.%m.%Y"))
-        self.assertEqual(context["ответственный_руководитель"], "manager")
-        self.assertEqual(context["производитель_работ"], "supervisor")
+        self.assertEqual(context["ответственный_руководитель"], "Manual manager")
+        self.assertEqual(context["производитель_работ"], "Manual producer")
+        self.assertEqual(context["характер_работ"], "Manual repair nature")
+        self.assertEqual(context["дополнительные_условия"], "Manual extra conditions")
+        self.assertEqual(context["дополнительные_меры_безопасности"], "Manual extra safety notes")
         self.assertEqual(context["создал_пользователь"], "creator")
         self.assertEqual(context["опасности"], "Steam")
         self.assertEqual(context["меры_безопасности"], "PPE")
@@ -210,6 +221,9 @@ class GeneratePermitDocxTests(TestCase):
         document.add_paragraph("Дата начала {{ дата_начала }}")
         document.add_paragraph("Дата окончания {{ дата_окончания }}")
         document.add_paragraph("Дата создания {{ дата_создания }}")
+        document.add_paragraph("Характер {{ характер_работ }}")
+        document.add_paragraph("Условия {{ дополнительные_условия }}")
+        document.add_paragraph("Доп меры {{ дополнительные_меры_безопасности }}")
         document.add_paragraph("Ответственный {{ ответственный_руководитель }}")
         document.add_paragraph("Производитель {{ производитель_работ }}")
         document.add_paragraph("Создал {{ создал_пользователь }}")

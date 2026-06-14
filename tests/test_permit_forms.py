@@ -17,6 +17,11 @@ class PermitFormTests(TestCase):
         self.assertIn("work_type", form.fields)
         self.assertIn("hazards", form.fields)
         self.assertIn("safety_measures", form.fields)
+        self.assertIn("responsible_manager_text", form.fields)
+        self.assertIn("work_producer_text", form.fields)
+        self.assertIn("work_nature_text", form.fields)
+        self.assertIn("additional_conditions", form.fields)
+        self.assertIn("additional_safety_notes", form.fields)
 
     def test_permit_form_uses_only_active_reference_values(self):
         active_area = WorkArea.objects.create(name="Active area")

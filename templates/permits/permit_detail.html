@@ -14,6 +14,11 @@
         <dt>Work starts at</dt><dd>{{ permit.work_starts_at }}</dd>
         <dt>Work ends at</dt><dd>{{ permit.work_ends_at }}</dd>
         <dt>Work location</dt><dd>{{ permit.work_location }}</dd>
+        <dt>Responsible manager text</dt><dd>{{ permit.responsible_manager_text|default:"Not specified" }}</dd>
+        <dt>Work producer text</dt><dd>{{ permit.work_producer_text|default:"Not specified" }}</dd>
+        <dt>Work nature</dt><dd>{{ permit.work_nature_text|default:"Not specified" }}</dd>
+        <dt>Additional conditions</dt><dd>{{ permit.additional_conditions|default:"Not specified" }}</dd>
+        <dt>Additional safety notes</dt><dd>{{ permit.additional_safety_notes|default:"Not specified" }}</dd>
         <dt>Work area</dt><dd>{{ permit.work_area|default:"Not specified" }}</dd>
         <dt>Equipment</dt><dd>{{ permit.equipment|default:"Not specified" }}</dd>
         <dt>Work type</dt><dd>{{ permit.work_type|default:"Not specified" }}</dd>

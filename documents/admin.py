@@ -1,11 +1,15 @@
 """Admin registrations for the documents app."""
 
-from django.contrib import admin
+from django.contrib import admin, messages
+from django.core.exceptions import ValidationError
+from django.http import HttpResponse
 from django.template.response import TemplateResponse
-from django.urls import path
+from django.urls import path, reverse
+from django.utils.html import format_html
 
 from .forms import DocumentTemplateAdminForm
 from .models import DocumentTemplate, GeneratedDocument
+from .services import DOCX_TEMPLATE_ERROR_MESSAGE, generate_template_demo_docx
 
 
 TEMPLATE_VARIABLES = [
@@ -16,6 +20,9 @@ TEMPLATE_VARIABLES = [
     {"variable": "{{ вид_работ }}", "description": "Вид работ", "example": "Огневые работы"},
     {"variable": "{{ место_работ }}", "description": "Место выполнения работ", "example": "Площадка обслуживания"},
     {"variable": "{{ описание_работ }}", "description": "Описание выполняемых работ", "example": "Ремонт запорной арматуры"},
+    {"variable": "{{ характер_работ }}", "description": "Характер нестандартных работ", "example": "Осмотр и ремонт арматуры"},
+    {"variable": "{{ дополнительные_условия }}", "description": "Дополнительные условия и уточнения", "example": "Работы выполнять после инструктажа"},
+    {"variable": "{{ дополнительные_меры_безопасности }}", "description": "Дополнительные меры безопасности", "example": "Использовать диэлектрические перчатки"},
     {"variable": "{{ дата_начала }}", "description": "Дата начала работ", "example": "13.06.2026"},
     {"variable": "{{ дата_окончания }}", "description": "Дата окончания работ", "example": "13.06.2026"},
     {"variable": "{{ дата_создания }}", "description": "Дата создания наряда", "example": "12.06.2026"},
@@ -38,7 +45,7 @@ TEMPLATE_VARIABLE_RULES = [
 class DocumentTemplateAdmin(admin.ModelAdmin):
     form = DocumentTemplateAdminForm
     change_list_template = "admin/documents/documenttemplate/change_list.html"
-    list_display = ("name", "document_type", "version", "is_active", "uploaded_by", "created_at")
+    list_display = ("name", "document_type", "version", "is_active", "uploaded_by", "created_at", "test_template_link")
     list_filter = ("document_type", "is_active", "created_at")
     search_fields = ("name", "document_type", "version")
     readonly_fields = ("created_at",)
@@ -50,6 +57,11 @@ class DocumentTemplateAdmin(admin.ModelAdmin):
                 "template-variables/",
                 self.admin_site.admin_view(self.template_variables_view),
                 name="documents_documenttemplate_template_variables",
+            ),
+            path(
+                "<int:template_id>/test/",
+                self.admin_site.admin_view(self.test_template_view),
+                name="documents_documenttemplate_test",
             ),
         ]
         return custom_urls + urls
@@ -67,6 +79,36 @@ class DocumentTemplateAdmin(admin.ModelAdmin):
             "admin/documents/documenttemplate/template_variables.html",
             context,
         )
+
+
+    @admin.display(description="Проверка")
+    def test_template_link(self, obj):
+        url = reverse("admin:documents_documenttemplate_test", args=[obj.pk])
+        return format_html('<a class="button" href="{}">Проверить шаблон</a>', url)
+
+    def test_template_view(self, request, template_id):
+        try:
+            content, filename = generate_template_demo_docx(template_id)
+        except ValidationError:
+            messages.error(request, DOCX_TEMPLATE_ERROR_MESSAGE)
+            return TemplateResponse(
+                request,
+                "admin/documents/documenttemplate/template_test_error.html",
+                {
+                    **self.admin_site.each_context(request),
+                    "title": "Ошибка проверки DOCX-шаблона",
+                    "opts": self.model._meta,
+                    "message": DOCX_TEMPLATE_ERROR_MESSAGE,
+                },
+                status=200,
+            )
+
+        response = HttpResponse(
+            content,
+            content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        )
+        response["Content-Disposition"] = f'attachment; filename="{filename}"'
+        return response
 
 
 @admin.register(GeneratedDocument)

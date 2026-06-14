@@ -77,6 +77,11 @@ class PermitViewTests(TestCase):
             work_starts_at=starts_at,
             work_ends_at=starts_at + timedelta(hours=8),
             work_location="Workshop 1",
+            responsible_manager_text="Manual manager",
+            work_producer_text="Manual producer",
+            work_nature_text="Manual work nature",
+            additional_conditions="Manual additional conditions",
+            additional_safety_notes="Manual additional safety notes",
             work_area=self.work_area,
             equipment=self.equipment,
             work_type=self.work_type,
@@ -94,6 +99,11 @@ class PermitViewTests(TestCase):
             "work_starts_at": starts_at.strftime("%Y-%m-%dT%H:%M"),
             "work_ends_at": ends_at.strftime("%Y-%m-%dT%H:%M"),
             "work_location": "Pump station",
+            "responsible_manager_text": "Manual form manager",
+            "work_producer_text": "Manual form producer",
+            "work_nature_text": "Manual form work nature",
+            "additional_conditions": "Manual form additional conditions",
+            "additional_safety_notes": "Manual form additional safety notes",
             "work_area": self.work_area.pk,
             "equipment": self.equipment.pk,
             "work_type": self.work_type.pk,
@@ -245,6 +255,11 @@ class PermitViewTests(TestCase):
         self.assertEqual(permit.work_type, self.work_type)
         self.assertIn(self.hazard, permit.hazards.all())
         self.assertIn(self.safety_measure, permit.safety_measures.all())
+        self.assertEqual(permit.responsible_manager_text, "Manual form manager")
+        self.assertEqual(permit.work_producer_text, "Manual form producer")
+        self.assertEqual(permit.work_nature_text, "Manual form work nature")
+        self.assertEqual(permit.additional_conditions, "Manual form additional conditions")
+        self.assertEqual(permit.additional_safety_notes, "Manual form additional safety notes")
 
     def test_create_permit_page_writes_audit_log(self):
         response = self.client.post(reverse("permits:create"), data=self.permit_form_data("PT-WEB-AUDIT-NEW"))
@@ -264,12 +279,14 @@ class PermitViewTests(TestCase):
         permit = self.make_permit()
         data = self.permit_form_data(number=permit.number)
         data["work_location"] = "Updated location"
+        data["work_nature_text"] = "Updated manual work nature"
 
         response = self.client.post(reverse("permits:edit", kwargs={"pk": permit.pk}), data=data)
 
         permit.refresh_from_db()
         self.assertRedirects(response, reverse("permits:detail", kwargs={"pk": permit.pk}))
         self.assertEqual(permit.work_location, "Updated location")
+        self.assertEqual(permit.work_nature_text, "Updated manual work nature")
 
     def test_edit_permit_page_writes_changed_fields_audit_log(self):
         permit = self.make_permit(number="PT-WEB-AUDIT-EDIT")
@@ -301,6 +318,11 @@ class PermitViewTests(TestCase):
             work_starts_at=starts_at,
             work_ends_at=starts_at + timedelta(hours=8),
             work_location="Workshop 1",
+            responsible_manager_text="Manual manager",
+            work_producer_text="Manual producer",
+            work_nature_text="Manual work nature",
+            additional_conditions="Manual additional conditions",
+            additional_safety_notes="Manual additional safety notes",
             work_area=self.work_area,
             equipment=self.equipment,
             work_type=self.work_type,
@@ -314,6 +336,11 @@ class PermitViewTests(TestCase):
             "work_starts_at": timezone.localtime(permit.work_starts_at).strftime("%Y-%m-%dT%H:%M"),
             "work_ends_at": timezone.localtime(permit.work_ends_at).strftime("%Y-%m-%dT%H:%M"),
             "work_location": permit.work_location,
+            "responsible_manager_text": permit.responsible_manager_text,
+            "work_producer_text": permit.work_producer_text,
+            "work_nature_text": permit.work_nature_text,
+            "additional_conditions": permit.additional_conditions,
+            "additional_safety_notes": permit.additional_safety_notes,
             "work_area": self.work_area.pk,
             "equipment": self.equipment.pk,
             "work_type": self.work_type.pk,

@@ -6,8 +6,7 @@ from django import forms
 from docxtpl import DocxTemplate
 
 from .models import DocumentTemplate
-
-DOCX_TEMPLATE_ERROR_MESSAGE = "Ошибка в DOCX-шаблоне. Проверьте фигурные скобки и переменные."
+from .services import DOCX_TEMPLATE_ERROR_MESSAGE
 
 
 class DocumentTemplateAdminForm(forms.ModelForm):
