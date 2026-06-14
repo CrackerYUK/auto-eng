@@ -93,7 +93,7 @@
         <tr>
             <td>{{ item.created_at }}</td>
             <td>{{ item.actor }}</td>
-            <td>{{ item.action }}</td>
+            <td>{{ item.action|approval_action_label }}</td>
             <td>{{ item.get_old_status_display }}</td>
             <td>{{ item.get_new_status_display }}</td>
             <td>{{ item.comment }}</td>
@@ -127,7 +127,7 @@
                 {% if log.details.changes %}
                 <ul>
                     {% for field_name, change in log.details.changes.items %}
-                    <li>{{ field_name }}: было={{ change.old }}; стало={{ change.new }}</li>
+                    <li>{{ field_name|audit_field_label }}: было={{ change.old }}; стало={{ change.new }}</li>
                     {% endfor %}
                 </ul>
                 {% elif log.details.new_values %}
