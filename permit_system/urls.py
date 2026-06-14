@@ -5,6 +5,8 @@ from django.http import JsonResponse
 from django.shortcuts import redirect
 from django.urls import include, path
 
+from permits import views as permit_views
+
 
 def healthcheck(_request):
     """Return a small response for local Docker health checks."""
@@ -17,4 +19,5 @@ urlpatterns = [
     path("accounts/", include("django.contrib.auth.urls")),
     path("health/", healthcheck, name="healthcheck"),
     path("permits/", include("permits.urls")),
+    path("personnel/search/", permit_views.personnel_search, name="personnel_search"),
 ]

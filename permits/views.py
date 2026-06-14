@@ -6,8 +6,8 @@ from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied, ValidationError
-from django.db.models import Count
-from django.http import FileResponse, Http404, HttpResponseForbidden
+from django.db.models import Count, Q
+from django.http import FileResponse, Http404, HttpResponseForbidden, JsonResponse
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse, reverse_lazy
 from django.views.decorators.http import require_POST
@@ -32,8 +32,8 @@ from approvals.services import (
 )
 from documents.models import DocumentTemplate, GeneratedDocument
 from documents.services import PdfConversionError, convert_docx_to_pdf, generate_permit_docx
-from permits.forms import PermitForm
-from permits.models import Permit, PermitStatus
+from permits.forms import PermitForm, PermitParticipantFormSet
+from permits.models import Permit, PermitParticipantRole, PermitStatus, Personnel
 from users.roles import ROLE_CHIEF, ROLE_MASTER, ROLE_OPERATOR
 
 
@@ -181,10 +181,40 @@ class PermitDetailView(LoginRequiredMixin, DetailView):
         context["can_edit"] = permit.status in EDITABLE_STATUSES
         context["can_generate_docx"] = can_generate_permit_docx(permit, self.request.user)
         context["can_generate_pdf"] = can_manage_generated_document(permit, self.request.user)
+        context["participant_groups"] = group_permit_participants(permit)
         return context
 
 
-class PermitCreateView(LoginRequiredMixin, CreateView):
+class PermitParticipantFormSetMixin:
+    """Attach permit participant inline formsets to create/update views."""
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        if "participant_formset" not in context:
+            if self.request.method == "POST":
+                context["participant_formset"] = PermitParticipantFormSet(
+                    self.request.POST,
+                    instance=getattr(self, "object", None),
+                )
+            else:
+                context["participant_formset"] = PermitParticipantFormSet(
+                    instance=getattr(self, "object", None),
+                )
+        return context
+
+    def form_invalid(self, form):
+        return self.render_to_response(
+            self.get_context_data(
+                form=form,
+                participant_formset=PermitParticipantFormSet(
+                    self.request.POST,
+                    instance=getattr(self, "object", None),
+                ),
+            )
+        )
+
+
+class PermitCreateView(LoginRequiredMixin, PermitParticipantFormSetMixin, CreateView):
     """Create a draft permit."""
 
     model = Permit
@@ -192,17 +222,26 @@ class PermitCreateView(LoginRequiredMixin, CreateView):
     template_name = "permits/permit_form.html"
 
     def form_valid(self, form):
-        form.instance.status = PermitStatus.DRAFT
-        form.instance.created_by = self.request.user
-        response = super().form_valid(form)
+        self.object = form.save(commit=False)
+        self.object.status = PermitStatus.DRAFT
+        self.object.created_by = self.request.user
+        participant_formset = PermitParticipantFormSet(self.request.POST, instance=self.object)
+        if not participant_formset.is_valid():
+            return self.render_to_response(
+                self.get_context_data(form=form, participant_formset=participant_formset)
+            )
+        self.object.save()
+        form.save_m2m()
+        participant_formset.instance = self.object
+        participant_formset.save()
         create_permit_audit_log(self.object, self.request.user)
-        return response
+        return redirect(self.get_success_url())
 
     def get_success_url(self):
         return reverse_lazy("permits:detail", kwargs={"pk": self.object.pk})
 
 
-class PermitUpdateView(LoginRequiredMixin, UpdateView):
+class PermitUpdateView(LoginRequiredMixin, PermitParticipantFormSetMixin, UpdateView):
     """Edit a permit only while it is draft or returned."""
 
     model = Permit
@@ -219,7 +258,15 @@ class PermitUpdateView(LoginRequiredMixin, UpdateView):
 
     def form_valid(self, form):
         old_values = self._audit_old_values
-        response = super().form_valid(form)
+        self.object = form.save(commit=False)
+        participant_formset = PermitParticipantFormSet(self.request.POST, instance=self.object)
+        if not participant_formset.is_valid():
+            return self.render_to_response(
+                self.get_context_data(form=form, participant_formset=participant_formset)
+            )
+        self.object.save()
+        form.save_m2m()
+        participant_formset.save()
         new_values = capture_permit_audit_values(self.object)
         create_permit_update_audit_log(
             self.object,
@@ -227,7 +274,7 @@ class PermitUpdateView(LoginRequiredMixin, UpdateView):
             old_values,
             new_values,
         )
-        return response
+        return redirect(self.get_success_url())
 
     def get_success_url(self):
         return reverse_lazy("permits:detail", kwargs={"pk": self.object.pk})
@@ -355,6 +402,47 @@ def download_generated_pdf(request, pk):
         as_attachment=True,
         filename=generated_document.file_pdf.name.rsplit("/", 1)[-1],
     )
+
+
+@login_required
+def personnel_search(request):
+    """Return active personnel options for lightweight local autocomplete/search."""
+    query = request.GET.get("q", "").strip()
+    personnel = Personnel.objects.filter(is_active=True).select_related("group", "work_area")
+    if query:
+        personnel = personnel.filter(
+            Q(full_name__icontains=query)
+            | Q(personnel_number__icontains=query)
+            | Q(position__icontains=query)
+            | Q(group__name__icontains=query)
+        )
+    results = [{"id": item.pk, "label": str(item)} for item in personnel[:20]]
+    return JsonResponse({"results": results})
+
+
+def group_permit_participants(permit):
+    """Group permit participants for detail-page display."""
+    labels = {
+        PermitParticipantRole.RESPONSIBLE_MANAGER: "Ответственные руководители",
+        PermitParticipantRole.WORK_PRODUCER: "Производители работ",
+        PermitParticipantRole.PERFORMER: "Исполнители",
+        PermitParticipantRole.BRIGADE_MEMBER: "Члены бригады",
+        PermitParticipantRole.ADMITTING_PERSON: "Допускающие",
+        PermitParticipantRole.OBSERVER: "Наблюдающие",
+        PermitParticipantRole.OTHER: "Прочие",
+    }
+    grouped = {role: [] for role in labels}
+    participants = permit.participants.select_related(
+        "personnel",
+        "personnel__group",
+        "personnel__work_area",
+    )
+    for participant in participants:
+        grouped.setdefault(participant.role, []).append(participant)
+    return [
+        {"role": role, "label": label, "participants": grouped.get(role, [])}
+        for role, label in labels.items()
+    ]
 
 
 def can_generate_permit_docx(permit, user):

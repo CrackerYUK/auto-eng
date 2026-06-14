@@ -3,6 +3,7 @@
 from datetime import timedelta
 
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
 from django.test import TestCase
 from django.utils import timezone
 
@@ -13,7 +14,11 @@ from permits.models import (
     Equipment,
     Hazard,
     Permit,
+    PermitParticipant,
+    PermitParticipantRole,
     PermitStatus,
+    Personnel,
+    PersonnelGroup,
     SafetyMeasure,
     WorkArea,
     WorkType,
@@ -150,3 +155,48 @@ class PermitSystemModelTests(TestCase):
         self.assertEqual(self.permit.work_type, self.work_type)
         self.assertIn(self.hazard, self.permit.hazards.all())
         self.assertIn(self.safety_measure, self.permit.safety_measures.all())
+    def test_personnel_group_and_personnel_are_not_users(self):
+        group = PersonnelGroup.objects.create(name="Мастера")
+        worker = Personnel.objects.create(
+            full_name="Иванов Иван Иванович",
+            personnel_number="T-001",
+            position="мастер",
+            group=group,
+            work_area=self.work_area,
+        )
+
+        self.assertEqual(str(group), "Мастера")
+        self.assertIn("Иванов Иван Иванович", str(worker))
+        self.assertFalse(get_user_model().objects.filter(username="T-001").exists())
+
+    def test_permit_participant_can_use_personnel_or_manual_name(self):
+        group = PersonnelGroup.objects.create(name="Слесари")
+        worker = Personnel.objects.create(
+            full_name="Петров Пётр Петрович",
+            position="слесарь",
+            group=group,
+            work_area=self.work_area,
+        )
+        participant_with_personnel = PermitParticipant.objects.create(
+            permit=self.permit,
+            role=PermitParticipantRole.PERFORMER,
+            personnel=worker,
+        )
+        manual_participant = PermitParticipant.objects.create(
+            permit=self.permit,
+            role=PermitParticipantRole.OTHER,
+            manual_name="Представитель подрядчика",
+            note="ручной ввод",
+        )
+
+        self.assertIn("Петров Пётр Петрович", participant_with_personnel.display_name())
+        self.assertEqual(manual_participant.display_name(), "Представитель подрядчика (ручной ввод)")
+
+    def test_permit_participant_requires_personnel_or_manual_name(self):
+        participant = PermitParticipant(
+            permit=self.permit,
+            role=PermitParticipantRole.PERFORMER,
+        )
+
+        with self.assertRaisesMessage(ValidationError, "Choose personnel or enter manual participant name"):
+            participant.full_clean()

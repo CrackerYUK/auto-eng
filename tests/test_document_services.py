@@ -20,7 +20,18 @@ from documents.services import (
     convert_docx_to_pdf,
     generate_permit_docx,
 )
-from permits.models import Equipment, Hazard, Permit, SafetyMeasure, WorkArea, WorkType
+from permits.models import (
+    Equipment,
+    Hazard,
+    Permit,
+    PermitParticipant,
+    PermitParticipantRole,
+    Personnel,
+    PersonnelGroup,
+    SafetyMeasure,
+    WorkArea,
+    WorkType,
+)
 
 
 class GeneratePermitDocxTests(TestCase):
@@ -48,6 +59,21 @@ class GeneratePermitDocxTests(TestCase):
         self.work_type = WorkType.objects.create(name="Repair", description="Repair work")
         self.hazard = Hazard.objects.create(name="Steam", description="Hot steam")
         self.safety_measure = SafetyMeasure.objects.create(name="PPE", description="Wear PPE")
+        self.personnel_group = PersonnelGroup.objects.create(name="Masters")
+        self.personnel_manager = Personnel.objects.create(
+            full_name="John Manager",
+            personnel_number="M-001",
+            position="Permit master",
+            group=self.personnel_group,
+            work_area=self.work_area,
+        )
+        self.personnel_performer = Personnel.objects.create(
+            full_name="Paul Performer",
+            personnel_number="P-001",
+            position="Mechanic",
+            group=self.personnel_group,
+            work_area=self.work_area,
+        )
 
         starts_at = timezone.now() + timedelta(days=1)
         self.permit = Permit.objects.create(
@@ -70,6 +96,26 @@ class GeneratePermitDocxTests(TestCase):
         )
         self.permit.hazards.add(self.hazard)
         self.permit.safety_measures.add(self.safety_measure)
+        PermitParticipant.objects.create(
+            permit=self.permit,
+            role=PermitParticipantRole.RESPONSIBLE_MANAGER,
+            personnel=self.personnel_manager,
+            note="lead",
+            sort_order=1,
+        )
+        PermitParticipant.objects.create(
+            permit=self.permit,
+            role=PermitParticipantRole.PERFORMER,
+            personnel=self.personnel_performer,
+            sort_order=2,
+        )
+        PermitParticipant.objects.create(
+            permit=self.permit,
+            role=PermitParticipantRole.BRIGADE_MEMBER,
+            manual_name="Manual Brigade Member",
+            note="manual",
+            sort_order=3,
+        )
         self.template = DocumentTemplate.objects.create(
             name="Permit DOCX template",
             document_type="permit",
@@ -107,26 +153,29 @@ class GeneratePermitDocxTests(TestCase):
         self.assertIn("Work type Repair", rendered_text)
         self.assertIn("Hazards Steam", rendered_text)
         self.assertIn("Safety PPE", rendered_text)
-        self.assertIn("Номер PT-DOCX-001", rendered_text)
-        self.assertIn("Статус Draft", rendered_text)
-        self.assertIn("Участок Boiler house", rendered_text)
-        self.assertIn("Оборудование Valve A", rendered_text)
-        self.assertIn("Вид работ Repair", rendered_text)
-        self.assertIn("Место Boiler room", rendered_text)
-        self.assertIn("Описание Inspect and repair valve", rendered_text)
-        self.assertIn(f"Дата начала {timezone.localtime(self.permit.work_starts_at):%d.%m.%Y}", rendered_text)
-        self.assertIn(f"Дата окончания {timezone.localtime(self.permit.work_ends_at):%d.%m.%Y}", rendered_text)
-        self.assertIn(f"Дата создания {timezone.localtime(self.permit.created_at):%d.%m.%Y}", rendered_text)
-        self.assertIn("Ответственный Manual manager", rendered_text)
-        self.assertIn("Производитель Manual producer", rendered_text)
-        self.assertIn("Характер Manual repair nature", rendered_text)
-        self.assertIn("Условия Manual extra conditions", rendered_text)
-        self.assertIn("Доп меры Manual extra safety notes", rendered_text)
-        self.assertIn("Создал creator", rendered_text)
-        self.assertIn("Опасности Steam", rendered_text)
-        self.assertIn("Меры PPE", rendered_text)
-        self.assertIn("Шаблон Permit DOCX template", rendered_text)
-        self.assertIn("Версия docx-test-1", rendered_text)
+        self.assertIn("Nomer PT-DOCX-001", rendered_text)
+        self.assertIn("Status Draft", rendered_text)
+        self.assertIn("Uchastok Boiler house", rendered_text)
+        self.assertIn("Oborudovanie Valve A", rendered_text)
+        self.assertIn("Vid Repair", rendered_text)
+        self.assertIn("Mesto Boiler room", rendered_text)
+        self.assertIn("Opisanie Inspect and repair valve", rendered_text)
+        self.assertIn(f"Data start {timezone.localtime(self.permit.work_starts_at):%d.%m.%Y}", rendered_text)
+        self.assertIn(f"Data end {timezone.localtime(self.permit.work_ends_at):%d.%m.%Y}", rendered_text)
+        self.assertIn(f"Data created {timezone.localtime(self.permit.created_at):%d.%m.%Y}", rendered_text)
+        self.assertIn("Rukovoditel John Manager", rendered_text)
+        self.assertIn("Ispolniteli Paul Performer", rendered_text)
+        self.assertIn("Brigada Manual Brigade Member", rendered_text)
+        self.assertIn("Uchastniki John Manager", rendered_text)
+        self.assertIn("Proizvoditel Manual producer", rendered_text)
+        self.assertIn("Harakter Manual repair nature", rendered_text)
+        self.assertIn("Usloviya Manual extra conditions", rendered_text)
+        self.assertIn("Dop mery Manual extra safety notes", rendered_text)
+        self.assertIn("Sozdal creator", rendered_text)
+        self.assertIn("Opasnosti Steam", rendered_text)
+        self.assertIn("Mery PPE", rendered_text)
+        self.assertIn("Shablon Permit DOCX template", rendered_text)
+        self.assertIn("Versiya docx-test-1", rendered_text)
 
     def test_build_permit_context_contains_reference_directory_fields(self):
         context = _build_permit_context(self.permit)["permit"]
@@ -140,29 +189,34 @@ class GeneratePermitDocxTests(TestCase):
         self.assertEqual(context["safety_measure_names"], ["PPE"])
         self.assertEqual(context["safety_measure_names_text"], "PPE")
 
-    def test_build_permit_context_contains_russian_docx_aliases(self):
+    def test_build_permit_context_contains_translit_docx_aliases(self):
         context = _build_permit_context(self.permit, self.template)
 
-        self.assertEqual(context["номер_наряда"], "PT-DOCX-001")
-        self.assertEqual(context["статус_наряда"], "Draft")
-        self.assertEqual(context["участок"], "Boiler house")
-        self.assertEqual(context["оборудование"], "Valve A")
-        self.assertEqual(context["вид_работ"], "Repair")
-        self.assertEqual(context["место_работ"], "Boiler room")
-        self.assertEqual(context["описание_работ"], "Inspect and repair valve")
-        self.assertEqual(context["дата_начала"], timezone.localtime(self.permit.work_starts_at).strftime("%d.%m.%Y"))
-        self.assertEqual(context["дата_окончания"], timezone.localtime(self.permit.work_ends_at).strftime("%d.%m.%Y"))
-        self.assertEqual(context["дата_создания"], timezone.localtime(self.permit.created_at).strftime("%d.%m.%Y"))
-        self.assertEqual(context["ответственный_руководитель"], "Manual manager")
-        self.assertEqual(context["производитель_работ"], "Manual producer")
-        self.assertEqual(context["характер_работ"], "Manual repair nature")
-        self.assertEqual(context["дополнительные_условия"], "Manual extra conditions")
-        self.assertEqual(context["дополнительные_меры_безопасности"], "Manual extra safety notes")
-        self.assertEqual(context["создал_пользователь"], "creator")
-        self.assertEqual(context["опасности"], "Steam")
-        self.assertEqual(context["меры_безопасности"], "PPE")
-        self.assertEqual(context["шаблон_документа"], "Permit DOCX template")
-        self.assertEqual(context["версия_шаблона"], "docx-test-1")
+        self.assertEqual(context["nomer_naryada"], "PT-DOCX-001")
+        self.assertEqual(context["status_naryada"], "Draft")
+        self.assertEqual(context["uchastok"], "Boiler house")
+        self.assertEqual(context["oborudovanie"], "Valve A")
+        self.assertEqual(context["vid_rabot"], "Repair")
+        self.assertEqual(context["mesto_rabot"], "Boiler room")
+        self.assertEqual(context["opisanie_rabot"], "Inspect and repair valve")
+        self.assertEqual(context["data_nachala"], timezone.localtime(self.permit.work_starts_at).strftime("%d.%m.%Y"))
+        self.assertEqual(context["data_okonchaniya"], timezone.localtime(self.permit.work_ends_at).strftime("%d.%m.%Y"))
+        self.assertEqual(context["data_sozdaniya"], timezone.localtime(self.permit.created_at).strftime("%d.%m.%Y"))
+        self.assertEqual(context["otvetstvennyy_rukovoditel"], "John Manager — Permit master (lead)")
+        self.assertEqual(context["proizvoditel_rabot"], "Manual producer")
+        self.assertEqual(context["harakter_rabot"], "Manual repair nature")
+        self.assertEqual(context["dopolnitelnye_usloviya"], "Manual extra conditions")
+        self.assertEqual(context["dopolnitelnye_mery_bezopasnosti"], "Manual extra safety notes")
+        self.assertEqual(context["sozdal_polzovatel"], "creator")
+        self.assertEqual(context["opasnosti"], "Steam")
+        self.assertEqual(context["mery_bezopasnosti"], "PPE")
+        self.assertEqual(context["otvetstvennye_rukovoditeli"], "John Manager — Permit master (lead)")
+        self.assertEqual(context["ispolniteli"], "Paul Performer — Mechanic")
+        self.assertEqual(context["chleny_brigady"], "Manual Brigade Member (manual)")
+        self.assertIn("John Manager — Permit master (lead)", context["uchastniki_rabot"])
+        self.assertIn("Manual Brigade Member (manual)", context["uchastniki_rabot"])
+        self.assertEqual(context["shablon_dokumenta"], "Permit DOCX template")
+        self.assertEqual(context["versiya_shablona"], "docx-test-1")
 
     @override_settings(PDF_CONVERTER_ENABLED=False)
     def test_convert_docx_to_pdf_reports_disabled_converter(self):
@@ -211,26 +265,29 @@ class GeneratePermitDocxTests(TestCase):
         document.add_paragraph("Work type {{ permit.work_type_name }}")
         document.add_paragraph("Hazards {{ permit.hazard_names_text }}")
         document.add_paragraph("Safety {{ permit.safety_measure_names_text }}")
-        document.add_paragraph("Номер {{ номер_наряда }}")
-        document.add_paragraph("Статус {{ статус_наряда }}")
-        document.add_paragraph("Участок {{ участок }}")
-        document.add_paragraph("Оборудование {{ оборудование }}")
-        document.add_paragraph("Вид работ {{ вид_работ }}")
-        document.add_paragraph("Место {{ место_работ }}")
-        document.add_paragraph("Описание {{ описание_работ }}")
-        document.add_paragraph("Дата начала {{ дата_начала }}")
-        document.add_paragraph("Дата окончания {{ дата_окончания }}")
-        document.add_paragraph("Дата создания {{ дата_создания }}")
-        document.add_paragraph("Характер {{ характер_работ }}")
-        document.add_paragraph("Условия {{ дополнительные_условия }}")
-        document.add_paragraph("Доп меры {{ дополнительные_меры_безопасности }}")
-        document.add_paragraph("Ответственный {{ ответственный_руководитель }}")
-        document.add_paragraph("Производитель {{ производитель_работ }}")
-        document.add_paragraph("Создал {{ создал_пользователь }}")
-        document.add_paragraph("Опасности {{ опасности }}")
-        document.add_paragraph("Меры {{ меры_безопасности }}")
-        document.add_paragraph("Шаблон {{ шаблон_документа }}")
-        document.add_paragraph("Версия {{ версия_шаблона }}")
+        document.add_paragraph("Nomer {{ nomer_naryada }}")
+        document.add_paragraph("Status {{ status_naryada }}")
+        document.add_paragraph("Uchastok {{ uchastok }}")
+        document.add_paragraph("Oborudovanie {{ oborudovanie }}")
+        document.add_paragraph("Vid {{ vid_rabot }}")
+        document.add_paragraph("Mesto {{ mesto_rabot }}")
+        document.add_paragraph("Opisanie {{ opisanie_rabot }}")
+        document.add_paragraph("Data start {{ data_nachala }}")
+        document.add_paragraph("Data end {{ data_okonchaniya }}")
+        document.add_paragraph("Data created {{ data_sozdaniya }}")
+        document.add_paragraph("Harakter {{ harakter_rabot }}")
+        document.add_paragraph("Usloviya {{ dopolnitelnye_usloviya }}")
+        document.add_paragraph("Dop mery {{ dopolnitelnye_mery_bezopasnosti }}")
+        document.add_paragraph("Rukovoditel {{ otvetstvennyy_rukovoditel }}")
+        document.add_paragraph("Proizvoditel {{ proizvoditel_rabot }}")
+        document.add_paragraph("Ispolniteli {{ ispolniteli }}")
+        document.add_paragraph("Brigada {{ chleny_brigady }}")
+        document.add_paragraph("Uchastniki {{ uchastniki_rabot }}")
+        document.add_paragraph("Sozdal {{ sozdal_polzovatel }}")
+        document.add_paragraph("Opasnosti {{ opasnosti }}")
+        document.add_paragraph("Mery {{ mery_bezopasnosti }}")
+        document.add_paragraph("Shablon {{ shablon_dokumenta }}")
+        document.add_paragraph("Versiya {{ versiya_shablona }}")
         output = BytesIO()
         document.save(output)
         return output.getvalue()

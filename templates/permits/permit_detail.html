@@ -33,6 +33,22 @@
     {% if can_edit %}<p><a href="{% url 'permits:edit' permit.pk %}">Edit permit</a></p>{% endif %}
 </section>
 
+<section>
+    <h3>Участники и ответственные</h3>
+    {% for group in participant_groups %}
+    <h4>{{ group.label }}</h4>
+    <ul>
+        {% for participant in group.participants %}
+        <li>{{ participant.display_name }}</li>
+        {% empty %}
+        <li>Не указаны</li>
+        {% endfor %}
+    </ul>
+    {% empty %}
+    <p>Участники не указаны.</p>
+    {% endfor %}
+</section>
+
 <section class="actions">
     <h3>Действия</h3>
     {% for action in available_actions %}

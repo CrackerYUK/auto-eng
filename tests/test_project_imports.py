@@ -1,5 +1,7 @@
 """Smoke tests for the initial Django project scaffold."""
 
+from pathlib import Path
+
 from django.apps import apps
 from django.conf import settings
 from django.test import SimpleTestCase
@@ -23,3 +25,12 @@ class ProjectScaffoldTests(SimpleTestCase):
         """Django app registry should contain all baseline apps."""
         registered_app_labels = {app_config.label for app_config in apps.get_app_configs()}
         self.assertTrue(REQUIRED_LOCAL_APPS.issubset(registered_app_labels))
+
+    def test_docx_mapping_recommends_translit_variables(self):
+        """DOCX mapping should prefer translit variables over Cyrillic variable names."""
+        mapping = Path(settings.BASE_DIR, "DOCX_TEMPLATE_MAPPING.md").read_text()
+
+        self.assertIn("{{ nomer_naryada }}", mapping)
+        self.assertIn("Не используйте кириллицу внутри", mapping)
+        self.assertIn("Нерекомендуемые кириллические переменные", mapping)
+        self.assertNotIn("используйте русские переменные", mapping)

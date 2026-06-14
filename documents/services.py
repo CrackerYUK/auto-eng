@@ -14,7 +14,7 @@ from django.utils import timezone
 from docxtpl import DocxTemplate
 
 from documents.models import DocumentTemplate, GeneratedDocument
-from permits.models import Permit
+from permits.models import Permit, PermitParticipantRole
 
 
 class PdfConversionError(RuntimeError):
@@ -50,7 +50,12 @@ def generate_permit_docx(permit_id, template_id, user):
             "equipment",
             "work_type",
         )
-        .prefetch_related("hazards", "safety_measures")
+        .prefetch_related(
+            "hazards",
+            "safety_measures",
+            "participants__personnel__group",
+            "participants__personnel__work_area",
+        )
         .get(pk=permit_id)
     )
     template = DocumentTemplate.objects.get(pk=template_id)
@@ -143,8 +148,13 @@ def _build_permit_context(permit, template=None):
     created_by_name = _user_display_name(permit.created_by)
     template_name = template.name if template else ""
     template_version = template.version if template else ""
+    participant_context = _build_participant_context(
+        permit,
+        responsible_manager_fallback=responsible_manager_result,
+        work_producer_fallback=work_producer_result,
+    )
 
-    return {
+    context = {
         "permit": {
             "id": permit.pk,
             "number": permit.number,
@@ -181,27 +191,73 @@ def _build_permit_context(permit, template=None):
             "created_by_name": created_by_name,
             "updated_at": permit.updated_at,
         },
-        "номер_наряда": permit.number or "",
-        "статус_наряда": permit.get_status_display() or "",
-        "участок": permit.work_area.name if permit.work_area else "",
-        "оборудование": equipment_name,
-        "вид_работ": permit.work_type.name if permit.work_type else "",
-        "место_работ": permit.work_location or "",
-        "описание_работ": permit.work_description or "",
-        "характер_работ": permit.work_nature_text or "",
-        "дополнительные_условия": permit.additional_conditions or "",
-        "дополнительные_меры_безопасности": permit.additional_safety_notes or "",
-        "дата_начала": _format_docx_date(permit.work_starts_at),
-        "дата_окончания": _format_docx_date(permit.work_ends_at),
-        "дата_создания": _format_docx_date(permit.created_at),
-        "ответственный_руководитель": responsible_manager_result,
-        "производитель_работ": work_producer_result,
-        "создал_пользователь": created_by_name,
-        "опасности": ", ".join(hazard_names),
-        "меры_безопасности": ", ".join(safety_measure_names),
-        "шаблон_документа": template_name,
-        "версия_шаблона": template_version,
+        "nomer_naryada": permit.number or "",
+        "status_naryada": permit.get_status_display() or "",
+        "uchastok": permit.work_area.name if permit.work_area else "",
+        "oborudovanie": equipment_name,
+        "vid_rabot": permit.work_type.name if permit.work_type else "",
+        "mesto_rabot": permit.work_location or "",
+        "opisanie_rabot": permit.work_description or "",
+        "harakter_rabot": permit.work_nature_text or "",
+        "data_nachala": _format_docx_date(permit.work_starts_at),
+        "data_okonchaniya": _format_docx_date(permit.work_ends_at),
+        "data_sozdaniya": _format_docx_date(permit.created_at),
+        "sozdal_polzovatel": created_by_name,
+        "opasnosti": ", ".join(hazard_names),
+        "mery_bezopasnosti": ", ".join(safety_measure_names),
+        "dopolnitelnye_usloviya": permit.additional_conditions or "",
+        "dopolnitelnye_mery_bezopasnosti": permit.additional_safety_notes or "",
+        "shablon_dokumenta": template_name,
+        "versiya_shablona": template_version,
     }
+    context.update(participant_context)
+    return context
+
+
+def _build_participant_context(permit, responsible_manager_fallback="", work_producer_fallback=""):
+    participants = permit.participants.select_related(
+        "personnel",
+        "personnel__group",
+        "personnel__work_area",
+    )
+    grouped = {role: [] for role in PermitParticipantRole.values}
+    all_participants = []
+    for participant in participants:
+        formatted = _format_participant(participant)
+        if not formatted:
+            continue
+        grouped.setdefault(participant.role, []).append(formatted)
+        all_participants.append(formatted)
+
+    responsible_managers = grouped.get(PermitParticipantRole.RESPONSIBLE_MANAGER, [])
+    work_producers = grouped.get(PermitParticipantRole.WORK_PRODUCER, [])
+    responsible_manager = responsible_managers[0] if responsible_managers else responsible_manager_fallback
+    work_producer = work_producers[0] if work_producers else work_producer_fallback
+
+    return {
+        "otvetstvennye_rukovoditeli": "\n".join(responsible_managers) or responsible_manager_fallback or "",
+        "proizvoditeli_rabot": "\n".join(work_producers) or work_producer_fallback or "",
+        "ispolniteli": "\n".join(grouped.get(PermitParticipantRole.PERFORMER, [])),
+        "chleny_brigady": "\n".join(grouped.get(PermitParticipantRole.BRIGADE_MEMBER, [])),
+        "dopuskayushchie": "\n".join(grouped.get(PermitParticipantRole.ADMITTING_PERSON, [])),
+        "nablyudayushchie": "\n".join(grouped.get(PermitParticipantRole.OBSERVER, [])),
+        "prochie_uchastniki": "\n".join(grouped.get(PermitParticipantRole.OTHER, [])),
+        "uchastniki_rabot": "\n".join(all_participants),
+        "otvetstvennyy_rukovoditel": responsible_manager or "",
+        "proizvoditel_rabot": work_producer or "",
+    }
+
+
+def _format_participant(participant):
+    if participant.personnel_id:
+        value = participant.personnel.full_name
+        if participant.personnel.position:
+            value = f"{value} — {participant.personnel.position}"
+    else:
+        value = participant.manual_name.strip()
+    if participant.note:
+        value = f"{value} ({participant.note})"
+    return value
 
 
 def _build_demo_template_context(template):
@@ -211,6 +267,12 @@ def _build_demo_template_context(template):
     template_version = template.version if template else ""
     hazard_text = "Высота, Электрическое напряжение"
     safety_text = "Ограждение зоны работ, Проверка СИЗ"
+    responsible = "Иванов Иван Иванович — мастер участка"
+    producer = "Петров Пётр Петрович — производитель работ"
+    performer = "Сидоров Сергей Сергеевич — слесарь"
+    brigade_member = "Кузнецов Алексей Викторович — электромонтёр"
+    admitting = "Демо допускающий вручную (ручной ввод для проверки шаблона)"
+    all_participants = "\n".join([responsible, producer, performer, brigade_member, admitting])
     return {
         "permit": {
             "id": "demo",
@@ -221,8 +283,8 @@ def _build_demo_template_context(template):
             "work_starts_at": demo_date,
             "work_ends_at": demo_date,
             "work_location": "Площадка обслуживания насосной станции",
-            "responsible_manager_text": "Иванов Иван Иванович",
-            "work_producer_text": "Петров Пётр Петрович",
+            "responsible_manager_text": responsible,
+            "work_producer_text": producer,
             "work_nature_text": "Осмотр и ремонт запорной арматуры",
             "additional_conditions": "Работы выполнять после инструктажа и допуска ответственного лица.",
             "additional_safety_notes": "Использовать каски, очки и диэлектрические перчатки.",
@@ -235,31 +297,39 @@ def _build_demo_template_context(template):
             "safety_measure_names": safety_text.split(", "),
             "safety_measure_names_text": safety_text,
             "work_description": "Демонстрационная проверка DOCX-шаблона.",
-            "responsible_manager_name": "Иванов Иван Иванович",
-            "work_supervisor_name": "Петров Пётр Петрович",
+            "responsible_manager_name": responsible,
+            "work_supervisor_name": producer,
             "created_by_name": "operator",
             "updated_at": demo_date,
         },
-        "номер_наряда": "DEMO-001",
-        "статус_наряда": "Draft",
-        "участок": "Цех 1",
-        "оборудование": "Насос H-101",
-        "вид_работ": "Ремонтные работы",
-        "место_работ": "Площадка обслуживания насосной станции",
-        "описание_работ": "Демонстрационная проверка DOCX-шаблона.",
-        "характер_работ": "Осмотр и ремонт запорной арматуры",
-        "дополнительные_условия": "Работы выполнять после инструктажа и допуска ответственного лица.",
-        "дополнительные_меры_безопасности": "Использовать каски, очки и диэлектрические перчатки.",
-        "дата_начала": demo_date,
-        "дата_окончания": demo_date,
-        "дата_создания": demo_date,
-        "ответственный_руководитель": "Иванов Иван Иванович",
-        "производитель_работ": "Петров Пётр Петрович",
-        "создал_пользователь": "operator",
-        "опасности": hazard_text,
-        "меры_безопасности": safety_text,
-        "шаблон_документа": template_name,
-        "версия_шаблона": template_version,
+        "nomer_naryada": "DEMO-001",
+        "status_naryada": "Draft",
+        "uchastok": "Цех 1",
+        "oborudovanie": "Насос H-101",
+        "vid_rabot": "Ремонтные работы",
+        "mesto_rabot": "Площадка обслуживания насосной станции",
+        "opisanie_rabot": "Демонстрационная проверка DOCX-шаблона.",
+        "harakter_rabot": "Осмотр и ремонт запорной арматуры",
+        "data_nachala": demo_date,
+        "data_okonchaniya": demo_date,
+        "data_sozdaniya": demo_date,
+        "otvetstvennyy_rukovoditel": responsible,
+        "proizvoditel_rabot": producer,
+        "sozdal_polzovatel": "operator",
+        "opasnosti": hazard_text,
+        "mery_bezopasnosti": safety_text,
+        "dopolnitelnye_usloviya": "Работы выполнять после инструктажа и допуска ответственного лица.",
+        "dopolnitelnye_mery_bezopasnosti": "Использовать каски, очки и диэлектрические перчатки.",
+        "shablon_dokumenta": template_name,
+        "versiya_shablona": template_version,
+        "otvetstvennye_rukovoditeli": responsible,
+        "proizvoditeli_rabot": producer,
+        "ispolniteli": performer,
+        "chleny_brigady": brigade_member,
+        "dopuskayushchie": admitting,
+        "nablyudayushchie": "",
+        "prochie_uchastniki": "",
+        "uchastniki_rabot": all_participants,
     }
 
 

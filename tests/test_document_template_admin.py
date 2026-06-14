@@ -35,13 +35,13 @@ class DocumentTemplateAdminHelpTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Переменные DOCX-шаблона")
-        self.assertContains(response, "{{ номер_наряда }}")
-        self.assertContains(response, "{{ меры_безопасности }}")
-        self.assertContains(response, "{{ дополнительные_условия }}")
-        self.assertContains(response, "не ставить пробел между фигурными скобками")
+        self.assertContains(response, "{{ nomer_naryada }}")
+        self.assertContains(response, "{{ mery_bezopasnosti }}")
+        self.assertContains(response, "{{ dopolnitelnye_usloviya }}")
+        self.assertContains(response, "использовать только транслит-переменные")
 
     def test_document_template_changelist_links_to_variable_help_and_test_button(self):
-        template = self._template("valid.docx", "Наряд {{ номер_наряда }}")
+        template = self._template("valid.docx", "Наряд {{ nomer_naryada }}")
 
         response = self.client.get(reverse("admin:documents_documenttemplate_changelist"))
 
@@ -54,7 +54,7 @@ class DocumentTemplateAdminHelpTests(TestCase):
     def test_valid_template_can_be_checked_and_downloaded_without_generated_document(self):
         template = self._template(
             "valid.docx",
-            "Наряд {{ номер_наряда }} {{ место_работ }} {{ дополнительные_условия }}",
+            "Наряд {{ nomer_naryada }} {{ mesto_rabot }} {{ dopolnitelnye_usloviya }}",
         )
 
         response = self.client.get(reverse("admin:documents_documenttemplate_test", args=[template.pk]))

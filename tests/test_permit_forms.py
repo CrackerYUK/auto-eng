@@ -2,8 +2,8 @@
 
 from django.test import TestCase
 
-from permits.forms import PermitForm
-from permits.models import Equipment, Hazard, SafetyMeasure, WorkArea, WorkType
+from permits.forms import PermitForm, PermitParticipantForm
+from permits.models import Equipment, Hazard, Personnel, PersonnelGroup, SafetyMeasure, WorkArea, WorkType
 
 
 class PermitFormTests(TestCase):
@@ -56,3 +56,35 @@ class PermitFormTests(TestCase):
         self.assertNotIn(inactive_hazard, form.fields["hazards"].queryset)
         self.assertIn(active_measure, form.fields["safety_measures"].queryset)
         self.assertNotIn(inactive_measure, form.fields["safety_measures"].queryset)
+
+
+class PermitParticipantFormTests(TestCase):
+    """Checks personnel selection in participant forms."""
+
+    def test_participant_form_uses_only_active_personnel_with_context_label(self):
+        work_area = WorkArea.objects.create(name="Area for personnel")
+        group = PersonnelGroup.objects.create(name="Мастера")
+        active = Personnel.objects.create(
+            full_name="Иванов Иван Иванович",
+            personnel_number="P-001",
+            position="мастер",
+            group=group,
+            work_area=work_area,
+        )
+        inactive = Personnel.objects.create(
+            full_name="Неактивный работник",
+            position="слесарь",
+            group=group,
+            work_area=work_area,
+            is_active=False,
+        )
+
+        form = PermitParticipantForm()
+
+        self.assertIn(active, form.fields["personnel"].queryset)
+        self.assertNotIn(inactive, form.fields["personnel"].queryset)
+        label = form.fields["personnel"].label_from_instance(active)
+        self.assertIn("Иванов Иван Иванович", label)
+        self.assertIn("мастер", label)
+        self.assertIn("Мастера", label)
+        self.assertIn("Area for personnel", label)

@@ -10,12 +10,25 @@ from django.core.files.base import ContentFile
 from django.core.management import call_command
 from django.test import TestCase, override_settings
 from django.urls import reverse
+from django.utils.http import urlencode
 from django.utils import timezone
 
 from approvals.models import ApprovalAction
 from audit.models import AuditLog
 from documents.models import DocumentTemplate, GeneratedDocument
-from permits.models import Equipment, Hazard, Permit, PermitStatus, SafetyMeasure, WorkArea, WorkType
+from permits.models import (
+    Equipment,
+    Hazard,
+    Permit,
+    PermitParticipant,
+    PermitParticipantRole,
+    PermitStatus,
+    Personnel,
+    PersonnelGroup,
+    SafetyMeasure,
+    WorkArea,
+    WorkType,
+)
 from users.roles import ROLE_CHIEF, ROLE_MASTER, ROLE_OPERATOR
 
 
@@ -65,6 +78,21 @@ class PermitViewTests(TestCase):
         cls.work_type = WorkType.objects.create(name="Inspection")
         cls.hazard = Hazard.objects.create(name="Pressure")
         cls.safety_measure = SafetyMeasure.objects.create(name="Lockout")
+        cls.personnel_group = PersonnelGroup.objects.create(name="Мастера")
+        cls.personnel_manager = Personnel.objects.create(
+            full_name="Иванов Иван Иванович",
+            personnel_number="P-100",
+            position="мастер",
+            group=cls.personnel_group,
+            work_area=cls.work_area,
+        )
+        cls.personnel_performer = Personnel.objects.create(
+            full_name="Петров Пётр Петрович",
+            personnel_number="P-200",
+            position="слесарь",
+            group=cls.personnel_group,
+            work_area=cls.work_area,
+        )
 
     def setUp(self):
         self.client.force_login(self.operator)
@@ -112,6 +140,20 @@ class PermitViewTests(TestCase):
             "work_description": "Replace gasket",
             "responsible_manager": self.manager.pk,
             "work_supervisor": self.supervisor.pk,
+            "participants-TOTAL_FORMS": "2",
+            "participants-INITIAL_FORMS": "0",
+            "participants-MIN_NUM_FORMS": "0",
+            "participants-MAX_NUM_FORMS": "1000",
+            "participants-0-role": PermitParticipantRole.RESPONSIBLE_MANAGER,
+            "participants-0-personnel": self.personnel_manager.pk,
+            "participants-0-manual_name": "",
+            "participants-0-note": "from directory",
+            "participants-0-sort_order": "1",
+            "participants-1-role": PermitParticipantRole.PERFORMER,
+            "participants-1-personnel": "",
+            "participants-1-manual_name": "Manual performer",
+            "participants-1-note": "manual participant",
+            "participants-1-sort_order": "2",
         }
 
     def test_permit_list_page_shows_table_and_permit(self):
@@ -148,6 +190,16 @@ class PermitViewTests(TestCase):
             response,
             f"{reverse('login')}?next={reverse('permits:dashboard')}",
         )
+
+
+    def test_personnel_search_finds_active_personnel(self):
+        url = reverse("personnel_search") + "?" + urlencode({"q": "Иванов"})
+
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["results"][0]["id"], self.personnel_manager.pk)
+        self.assertIn("Иванов Иван Иванович", response.json()["results"][0]["label"])
 
     def test_dashboard_operator_sees_returned_permits_waiting_for_action(self):
         returned = self.make_permit(number="PT-DASHBOARD-RETURNED", status=PermitStatus.RETURNED)
@@ -189,6 +241,19 @@ class PermitViewTests(TestCase):
 
     def test_permit_detail_page_shows_core_sections(self):
         permit = self.make_permit()
+        PermitParticipant.objects.create(
+            permit=permit,
+            role=PermitParticipantRole.RESPONSIBLE_MANAGER,
+            personnel=self.personnel_manager,
+            note="detail",
+            sort_order=1,
+        )
+        PermitParticipant.objects.create(
+            permit=permit,
+            role=PermitParticipantRole.PERFORMER,
+            manual_name="Manual detail performer",
+            sort_order=2,
+        )
         action = ApprovalAction.objects.create(
             permit=permit,
             actor=self.operator,
@@ -242,6 +307,10 @@ class PermitViewTests(TestCase):
         self.assertContains(response, "Отправить на проверку")
         self.assertContains(response, "Действия")
         self.assertContains(response, "Comment for Отправить на проверку")
+        self.assertContains(response, "Участники и ответственные")
+        self.assertContains(response, "Ответственные руководители")
+        self.assertContains(response, "Иванов Иван Иванович")
+        self.assertContains(response, "Manual detail performer")
 
     def test_create_permit_page_creates_draft_permit(self):
         response = self.client.post(reverse("permits:create"), data=self.permit_form_data())
@@ -260,6 +329,19 @@ class PermitViewTests(TestCase):
         self.assertEqual(permit.work_nature_text, "Manual form work nature")
         self.assertEqual(permit.additional_conditions, "Manual form additional conditions")
         self.assertEqual(permit.additional_safety_notes, "Manual form additional safety notes")
+        self.assertEqual(permit.participants.count(), 2)
+        self.assertTrue(
+            permit.participants.filter(
+                role=PermitParticipantRole.RESPONSIBLE_MANAGER,
+                personnel=self.personnel_manager,
+            ).exists()
+        )
+        self.assertTrue(
+            permit.participants.filter(
+                role=PermitParticipantRole.PERFORMER,
+                manual_name="Manual performer",
+            ).exists()
+        )
 
     def test_create_permit_page_writes_audit_log(self):
         response = self.client.post(reverse("permits:create"), data=self.permit_form_data("PT-WEB-AUDIT-NEW"))
@@ -287,6 +369,7 @@ class PermitViewTests(TestCase):
         self.assertRedirects(response, reverse("permits:detail", kwargs={"pk": permit.pk}))
         self.assertEqual(permit.work_location, "Updated location")
         self.assertEqual(permit.work_nature_text, "Updated manual work nature")
+        self.assertEqual(permit.participants.count(), 2)
 
     def test_edit_permit_page_writes_changed_fields_audit_log(self):
         permit = self.make_permit(number="PT-WEB-AUDIT-EDIT")
@@ -349,6 +432,10 @@ class PermitViewTests(TestCase):
             "work_description": permit.work_description,
             "responsible_manager": self.manager.pk,
             "work_supervisor": self.supervisor.pk,
+            "participants-TOTAL_FORMS": "0",
+            "participants-INITIAL_FORMS": "0",
+            "participants-MIN_NUM_FORMS": "0",
+            "participants-MAX_NUM_FORMS": "1000",
         }
 
         response = self.client.post(reverse("permits:edit", kwargs={"pk": permit.pk}), data=data)

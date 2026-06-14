@@ -24,7 +24,7 @@ class DocumentTemplateAdminFormTests(TestCase):
         self.user = get_user_model().objects.create_user(username="template-admin")
 
     def test_valid_docx_template_can_be_saved(self):
-        form = self._form(self._docx_upload("valid.docx", "Permit {{ номер_наряда }}"))
+        form = self._form(self._docx_upload("valid.docx", "Permit {{ nomer_naryada }}"))
 
         self.assertTrue(form.is_valid(), form.errors)
         template = form.save()
@@ -41,7 +41,7 @@ class DocumentTemplateAdminFormTests(TestCase):
         self.assertIn(DOCX_TEMPLATE_ERROR_MESSAGE, form.errors["file"])
 
     def test_non_docx_file_is_rejected(self):
-        upload = SimpleUploadedFile("template.txt", "{{ номер_наряда }}".encode("utf-8"), content_type="text/plain")
+        upload = SimpleUploadedFile("template.txt", "{{ nomer_naryada }}".encode("utf-8"), content_type="text/plain")
         form = self._form(upload)
 
         self.assertFalse(form.is_valid())
