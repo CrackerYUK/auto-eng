@@ -154,7 +154,7 @@ class GeneratePermitDocxTests(TestCase):
         self.assertIn("Hazards Steam", rendered_text)
         self.assertIn("Safety PPE", rendered_text)
         self.assertIn("Nomer PT-DOCX-001", rendered_text)
-        self.assertIn("Status Draft", rendered_text)
+        self.assertIn("Status Черновик", rendered_text)
         self.assertIn("Uchastok Boiler house", rendered_text)
         self.assertIn("Oborudovanie Valve A", rendered_text)
         self.assertIn("Vid Repair", rendered_text)
@@ -193,7 +193,7 @@ class GeneratePermitDocxTests(TestCase):
         context = _build_permit_context(self.permit, self.template)
 
         self.assertEqual(context["nomer_naryada"], "PT-DOCX-001")
-        self.assertEqual(context["status_naryada"], "Draft")
+        self.assertEqual(context["status_naryada"], "Черновик")
         self.assertEqual(context["uchastok"], "Boiler house")
         self.assertEqual(context["oborudovanie"], "Valve A")
         self.assertEqual(context["vid_rabot"], "Repair")
@@ -222,7 +222,7 @@ class GeneratePermitDocxTests(TestCase):
     def test_convert_docx_to_pdf_reports_disabled_converter(self):
         generated_document = self._generated_document_with_docx()
 
-        with self.assertRaisesMessage(PdfConversionError, "PDF conversion is disabled"):
+        with self.assertRaisesMessage(PdfConversionError, "Конвертация PDF отключена"):
             convert_docx_to_pdf(generated_document.pk)
 
     @override_settings(PDF_CONVERTER_ENABLED=True, SOFFICE_PATH="missing-soffice")
@@ -230,7 +230,7 @@ class GeneratePermitDocxTests(TestCase):
     def test_convert_docx_to_pdf_reports_missing_soffice(self, _which):
         generated_document = self._generated_document_with_docx()
 
-        with self.assertRaisesMessage(PdfConversionError, "LibreOffice/soffice executable was not found"):
+        with self.assertRaisesMessage(PdfConversionError, "Исполняемый файл LibreOffice/soffice не найден"):
             convert_docx_to_pdf(generated_document.pk)
 
     @override_settings(PDF_CONVERTER_ENABLED=True, SOFFICE_PATH="soffice")

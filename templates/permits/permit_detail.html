@@ -1,36 +1,36 @@
 {% extends "base.html" %}
 {% load permit_status %}
 
-{% block title %}Permit {{ permit.number }}{% endblock %}
+{% block title %}Наряд {{ permit.number }}{% endblock %}
 
 {% block content %}
-<h2>Permit {{ permit.number }}</h2>
+<h2>Наряд {{ permit.number }}</h2>
 
 <section>
-    <h3>Main fields</h3>
+    <h3>Основные поля</h3>
     <dl>
-        <dt>Status</dt><dd><span class="{{ permit.status|permit_status_badge_class }}">{{ permit.status|permit_status_label }}</span></dd>
-        <dt>Created at</dt><dd>{{ permit.created_at }}</dd>
-        <dt>Work starts at</dt><dd>{{ permit.work_starts_at }}</dd>
-        <dt>Work ends at</dt><dd>{{ permit.work_ends_at }}</dd>
-        <dt>Work location</dt><dd>{{ permit.work_location }}</dd>
-        <dt>Responsible manager text</dt><dd>{{ permit.responsible_manager_text|default:"Not specified" }}</dd>
-        <dt>Work producer text</dt><dd>{{ permit.work_producer_text|default:"Not specified" }}</dd>
-        <dt>Work nature</dt><dd>{{ permit.work_nature_text|default:"Not specified" }}</dd>
-        <dt>Additional conditions</dt><dd>{{ permit.additional_conditions|default:"Not specified" }}</dd>
-        <dt>Additional safety notes</dt><dd>{{ permit.additional_safety_notes|default:"Not specified" }}</dd>
-        <dt>Work area</dt><dd>{{ permit.work_area|default:"Not specified" }}</dd>
-        <dt>Equipment</dt><dd>{{ permit.equipment|default:"Not specified" }}</dd>
-        <dt>Work type</dt><dd>{{ permit.work_type|default:"Not specified" }}</dd>
-        <dt>Hazards</dt><dd>{% for hazard in permit.hazards.all %}{{ hazard }}{% if not forloop.last %}, {% endif %}{% empty %}Not specified{% endfor %}</dd>
-        <dt>Safety measures</dt><dd>{% for measure in permit.safety_measures.all %}{{ measure }}{% if not forloop.last %}, {% endif %}{% empty %}Not specified{% endfor %}</dd>
-        <dt>Work description</dt><dd>{{ permit.work_description }}</dd>
-        <dt>Responsible manager</dt><dd>{{ permit.responsible_manager }}</dd>
-        <dt>Work supervisor</dt><dd>{{ permit.work_supervisor }}</dd>
-        <dt>Created by</dt><dd>{{ permit.created_by }}</dd>
-        <dt>Updated at</dt><dd>{{ permit.updated_at }}</dd>
+        <dt>Статус</dt><dd><span class="{{ permit.status|permit_status_badge_class }}">{{ permit.status|permit_status_label }}</span></dd>
+        <dt>Создан</dt><dd>{{ permit.created_at }}</dd>
+        <dt>Начало работ</dt><dd>{{ permit.work_starts_at }}</dd>
+        <dt>Окончание работ</dt><dd>{{ permit.work_ends_at }}</dd>
+        <dt>Место работ</dt><dd>{{ permit.work_location }}</dd>
+        <dt>Ответственный руководитель (ручной ввод)</dt><dd>{{ permit.responsible_manager_text|default:"Не указано" }}</dd>
+        <dt>Производитель работ (ручной ввод)</dt><dd>{{ permit.work_producer_text|default:"Не указано" }}</dd>
+        <dt>Характер работ</dt><dd>{{ permit.work_nature_text|default:"Не указано" }}</dd>
+        <dt>Дополнительные условия</dt><dd>{{ permit.additional_conditions|default:"Не указано" }}</dd>
+        <dt>Дополнительные меры безопасности</dt><dd>{{ permit.additional_safety_notes|default:"Не указано" }}</dd>
+        <dt>Участок</dt><dd>{{ permit.work_area|default:"Не указано" }}</dd>
+        <dt>Оборудование</dt><dd>{{ permit.equipment|default:"Не указано" }}</dd>
+        <dt>Вид работ</dt><dd>{{ permit.work_type|default:"Не указано" }}</dd>
+        <dt>Опасности</dt><dd>{% for hazard in permit.hazards.all %}{{ hazard }}{% if not forloop.last %}, {% endif %}{% empty %}Не указано{% endfor %}</dd>
+        <dt>Меры безопасности</dt><dd>{% for measure in permit.safety_measures.all %}{{ measure }}{% if not forloop.last %}, {% endif %}{% empty %}Не указано{% endfor %}</dd>
+        <dt>Описание работ</dt><dd>{{ permit.work_description }}</dd>
+        <dt>Ответственный руководитель</dt><dd>{{ permit.responsible_manager }}</dd>
+        <dt>Производитель работ</dt><dd>{{ permit.work_supervisor }}</dd>
+        <dt>Автор</dt><dd>{{ permit.created_by }}</dd>
+        <dt>Обновлён</dt><dd>{{ permit.updated_at }}</dd>
     </dl>
-    {% if can_edit %}<p><a href="{% url 'permits:edit' permit.pk %}">Edit permit</a></p>{% endif %}
+    {% if can_edit %}<p><a href="{% url 'permits:edit' permit.pk %}">Редактировать наряд</a></p>{% endif %}
 </section>
 
 <section>
@@ -54,38 +54,38 @@
     {% for action in available_actions %}
     <form method="post" action="{% url 'permits:action' permit.pk action.name %}">
         {% csrf_token %}
-        <label for="comment-{{ action.name }}">Comment for {{ action.label }}</label>
-        <textarea id="comment-{{ action.name }}" name="comment" rows="2" placeholder="Add a comment"></textarea>
+        <label for="comment-{{ action.name }}">Комментарий для {{ action.label }}</label>
+        <textarea id="comment-{{ action.name }}" name="comment" rows="2" placeholder="Добавьте комментарий"></textarea>
         <button type="submit">{{ action.label }}</button>
     </form>
     {% empty %}
-    <p>No actions are currently available for your role and this status.</p>
+    <p>Для вашей роли и текущего статуса доступных действий нет.</p>
     {% endfor %}
 </section>
 
 <section>
-    <h3>DOCX generation</h3>
+    <h3>Формирование DOCX</h3>
     {% if can_generate_docx %}
     <form method="post" action="{% url 'permits:generate_docx' permit.pk %}">
         {% csrf_token %}
-        <button type="submit">Сгенерировать DOCX</button>
+        <button type="submit">Сформировать DOCX</button>
     </form>
     {% else %}
-    <p>DOCX generation is available only for approved or closed permits and allowed roles.</p>
+    <p>Формирование DOCX доступно только для утверждённых или закрытых нарядов и разрешённых ролей.</p>
     {% endif %}
 </section>
 
 <section>
-    <h3>Approval history</h3>
+    <h3>История согласований</h3>
     <table>
         <thead>
         <tr>
-            <th>Created</th>
-            <th>Actor</th>
-            <th>Action</th>
-            <th>Old status</th>
-            <th>New status</th>
-            <th>Comment</th>
+            <th>Создано</th>
+            <th>Пользователь</th>
+            <th>Действие</th>
+            <th>Старый статус</th>
+            <th>Новый статус</th>
+            <th>Комментарий</th>
         </tr>
         </thead>
         <tbody>
@@ -99,7 +99,7 @@
             <td>{{ item.comment }}</td>
         </tr>
         {% empty %}
-        <tr><td colspan="6">No approval actions yet.</td></tr>
+        <tr><td colspan="6">Действий согласования пока нет.</td></tr>
         {% endfor %}
         </tbody>
     </table>
@@ -107,53 +107,53 @@
 
 
 <section>
-    <h3>Permit change history</h3>
+    <h3>История изменений наряда</h3>
     <table>
         <thead>
         <tr>
-            <th>Changed at</th>
-            <th>User</th>
-            <th>Action</th>
-            <th>Changes</th>
+            <th>Изменено</th>
+            <th>Пользователь</th>
+            <th>Действие</th>
+            <th>Изменения</th>
         </tr>
         </thead>
         <tbody>
         {% for log in permit_change_logs %}
         <tr>
             <td>{{ log.created_at }}</td>
-            <td>{{ log.user|default:"System" }}</td>
+            <td>{{ log.user|default:"Система" }}</td>
             <td>{{ log.action }}</td>
             <td>
                 {% if log.details.changes %}
                 <ul>
                     {% for field_name, change in log.details.changes.items %}
-                    <li>{{ field_name }}: old={{ change.old }}; new={{ change.new }}</li>
+                    <li>{{ field_name }}: было={{ change.old }}; стало={{ change.new }}</li>
                     {% endfor %}
                 </ul>
                 {% elif log.details.new_values %}
-                Permit created with initial values.
+                Наряд создан с начальными значениями.
                 {% else %}
-                No detailed changes recorded.
+                Подробные изменения не записаны.
                 {% endif %}
             </td>
         </tr>
         {% empty %}
-        <tr><td colspan="4">No permit changes yet.</td></tr>
+        <tr><td colspan="4">Изменений наряда пока нет.</td></tr>
         {% endfor %}
         </tbody>
     </table>
 </section>
 
 <section>
-    <h3>Generated documents</h3>
+    <h3>Сформированные документы</h3>
     <table>
         <thead>
         <tr>
-            <th>Created</th>
-            <th>Template</th>
+            <th>Создано</th>
+            <th>Шаблон</th>
             <th>DOCX</th>
             <th>PDF</th>
-            <th>Generated by</th>
+            <th>Сформировал</th>
         </tr>
         </thead>
         <tbody>
@@ -168,16 +168,16 @@
                 {% elif document.file_docx and can_generate_pdf %}
                 <form method="post" action="{% url 'permits:generate_pdf' document.pk %}">
                     {% csrf_token %}
-                    <button type="submit">Сгенерировать PDF</button>
+                    <button type="submit">Сформировать PDF</button>
                 </form>
                 {% else %}
-                Not generated
+                Не сформирован
                 {% endif %}
             </td>
             <td>{{ document.generated_by }}</td>
         </tr>
         {% empty %}
-        <tr><td colspan="5">No generated documents yet.</td></tr>
+        <tr><td colspan="5">Сформированных документов пока нет.</td></tr>
         {% endfor %}
         </tbody>
     </table>

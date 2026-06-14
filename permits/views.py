@@ -251,7 +251,7 @@ class PermitUpdateView(LoginRequiredMixin, PermitParticipantFormSetMixin, Update
     def dispatch(self, request, *args, **kwargs):
         self.object = self.get_object()
         if self.object.status not in EDITABLE_STATUSES:
-            return HttpResponseForbidden("Permit can be edited only in draft or returned status.")
+            return HttpResponseForbidden("Наряд можно редактировать только в статусе черновика или возврата на доработку.")
         if request.method == "POST":
             self._audit_old_values = capture_permit_audit_values(self.object)
         return super().dispatch(request, *args, **kwargs)
@@ -287,18 +287,18 @@ def permit_action(request, pk, action):
     permit = get_object_or_404(Permit, pk=pk)
     handler = ACTION_HANDLERS.get(action)
     if handler is None:
-        return HttpResponseForbidden("Unknown permit action.")
+        return HttpResponseForbidden("Неизвестное действие с нарядом.")
 
     if not can_apply_transition(permit, request.user, action):
-        messages.error(request, "Action is not allowed for your role or the current permit status.")
-        return HttpResponseForbidden("Permit action is not allowed.")
+        messages.error(request, "Действие недоступно для вашей роли или текущего статуса наряда.")
+        return HttpResponseForbidden("Действие с нарядом недоступно.")
 
     try:
         handler(permit, request.user, request.POST.get("comment", ""))
     except (PermissionDenied, ValidationError) as exc:
         messages.error(request, exc)
     else:
-        messages.success(request, f"Action '{ACTION_LABELS[action]}' completed.")
+        messages.success(request, f"Действие «{ACTION_LABELS[action]}» выполнено.")
     return redirect("permits:detail", pk=permit.pk)
 
 
@@ -308,8 +308,8 @@ def generate_docx(request, pk):
     """Generate a DOCX document for a permit using the active permit template."""
     permit = get_object_or_404(Permit, pk=pk)
     if not can_generate_permit_docx(permit, request.user):
-        messages.error(request, "DOCX generation is not allowed for this permit status.")
-        return HttpResponseForbidden("DOCX generation is not allowed.")
+        messages.error(request, "Формирование DOCX недоступно для этого статуса наряда.")
+        return HttpResponseForbidden("Формирование DOCX недоступно.")
 
     template = (
         DocumentTemplate.objects.filter(document_type="permit", is_active=True)
@@ -317,7 +317,7 @@ def generate_docx(request, pk):
         .first()
     )
     if template is None:
-        messages.error(request, "No active DOCX template for permit documents is configured.")
+        messages.error(request, "Активный DOCX-шаблон для нарядов не настроен.")
         return redirect("permits:detail", pk=permit.pk)
 
     generated_document = generate_permit_docx(
@@ -325,7 +325,7 @@ def generate_docx(request, pk):
         template_id=template.pk,
         user=request.user,
     )
-    messages.success(request, "DOCX document generated successfully. Download link is available below.")
+    messages.success(request, "DOCX-документ успешно сформирован. Ссылка для скачивания доступна ниже.")
     return redirect("permits:detail", pk=permit.pk)
 
 
@@ -342,10 +342,10 @@ def download_generated_document(request, pk):
         pk=pk,
     )
     if not can_download_generated_document(generated_document, request.user):
-        raise Http404("Generated document was not found.")
+        raise Http404("Сформированный документ не найден.")
 
     if not generated_document.file_docx:
-        raise Http404("Generated DOCX file was not found.")
+        raise Http404("Сформированный DOCX-файл не найден.")
 
     return FileResponse(
         generated_document.file_docx.open("rb"),
@@ -368,14 +368,14 @@ def generate_pdf(request, pk):
         pk=pk,
     )
     if not can_manage_generated_document(generated_document.permit, request.user):
-        return HttpResponseForbidden("PDF generation is not allowed.")
+        return HttpResponseForbidden("Формирование PDF недоступно.")
 
     try:
         convert_docx_to_pdf(generated_document.pk)
     except PdfConversionError as exc:
         messages.error(request, str(exc))
     else:
-        messages.success(request, "PDF document generated successfully. Download link is available below.")
+        messages.success(request, "PDF-документ успешно сформирован. Ссылка для скачивания доступна ниже.")
     return redirect("permits:detail", pk=generated_document.permit.pk)
 
 
@@ -392,10 +392,10 @@ def download_generated_pdf(request, pk):
         pk=pk,
     )
     if not can_download_generated_document(generated_document, request.user):
-        raise Http404("Generated document was not found.")
+        raise Http404("Сформированный документ не найден.")
 
     if not generated_document.file_pdf:
-        raise Http404("Generated PDF file was not found.")
+        raise Http404("Сформированный PDF-файл не найден.")
 
     return FileResponse(
         generated_document.file_pdf.open("rb"),
