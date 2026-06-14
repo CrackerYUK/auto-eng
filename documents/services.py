@@ -84,21 +84,21 @@ def generate_permit_docx(permit_id, template_id, user):
 def convert_docx_to_pdf(generated_document_id):
     """Convert a generated DOCX to PDF when PDF conversion is explicitly enabled."""
     if not settings.PDF_CONVERTER_ENABLED:
-        raise PdfConversionError("PDF conversion is disabled. Set PDF_CONVERTER_ENABLED=1 to enable it.")
+        raise PdfConversionError("Конвертация PDF отключена. Установите PDF_CONVERTER_ENABLED=1 для включения.")
 
     soffice_path = shutil.which(settings.SOFFICE_PATH)
     if not soffice_path:
         raise PdfConversionError(
-            "LibreOffice/soffice executable was not found. Set SOFFICE_PATH to enable PDF conversion."
+            "Исполняемый файл LibreOffice/soffice не найден. Укажите SOFFICE_PATH для конвертации PDF."
         )
 
     generated_document = GeneratedDocument.objects.get(pk=generated_document_id)
     if not generated_document.file_docx:
-        raise PdfConversionError("Generated DOCX file is missing; PDF conversion cannot be started.")
+        raise PdfConversionError("Сформированный DOCX-файл отсутствует; конвертация PDF не может быть запущена.")
 
     docx_path = Path(generated_document.file_docx.path)
     if not docx_path.exists():
-        raise PdfConversionError(f"Generated DOCX file does not exist: {docx_path}")
+        raise PdfConversionError(f"Сформированный DOCX-файл не существует: {docx_path}")
 
     with TemporaryDirectory() as output_dir:
         output_path = Path(output_dir) / f"{docx_path.stem}.pdf"
@@ -120,11 +120,11 @@ def convert_docx_to_pdf(generated_document_id):
             )
         except subprocess.CalledProcessError as exc:
             raise PdfConversionError(
-                f"PDF conversion failed: {exc.stderr or exc.stdout or exc}"
+                f"Ошибка конвертации PDF: {exc.stderr or exc.stdout or exc}"
             ) from exc
 
         if not output_path.exists():
-            raise PdfConversionError("PDF conversion finished but no PDF file was produced.")
+            raise PdfConversionError("Конвертация PDF завершилась, но PDF-файл не был создан.")
 
         generated_document.file_pdf.save(
             _generated_pdf_name(generated_document),
@@ -270,7 +270,7 @@ def _build_demo_template_context(template):
             "id": "demo",
             "number": "DEMO-001",
             "status": "draft",
-            "status_display": "Draft",
+            "status_display": "Черновик",
             "created_at": demo_date,
             "work_starts_at": demo_date,
             "work_ends_at": demo_date,
@@ -295,7 +295,7 @@ def _build_demo_template_context(template):
             "updated_at": demo_date,
         },
         "nomer_naryada": "DEMO-001",
-        "status_naryada": "Draft",
+        "status_naryada": "Черновик",
         "uchastok": "Цех 1",
         "oborudovanie": "Насос H-101",
         "vid_rabot": "Ремонтные работы",

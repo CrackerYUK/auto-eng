@@ -199,5 +199,5 @@ class PermitSystemModelTests(TestCase):
             role=PermitParticipantRole.PERFORMER,
         )
 
-        with self.assertRaisesMessage(ValidationError, "Choose personnel or enter manual participant name"):
+        with self.assertRaisesMessage(ValidationError, "Выберите работника из справочника"):
             participant.full_clean()

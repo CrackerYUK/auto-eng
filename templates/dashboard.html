@@ -1,18 +1,18 @@
 {% extends "base.html" %}
 {% load permit_status %}
 
-{% block title %}Dashboard{% endblock %}
+{% block title %}Панель управления{% endblock %}
 
 {% block content %}
-<h2>Dashboard</h2>
+<h2>Панель управления</h2>
 
 <section>
-    <h3>Permit counts by status</h3>
+    <h3>Количество нарядов по статусам</h3>
     <table>
         <thead>
         <tr>
-            <th>Status</th>
-            <th>Count</th>
+            <th>Статус</th>
+            <th>Количество</th>
         </tr>
         </thead>
         <tbody>
@@ -27,15 +27,15 @@
 </section>
 
 <section>
-    <h3>Awaiting your action</h3>
+    <h3>Ожидают вашего действия</h3>
     <table>
         <thead>
         <tr>
-            <th>Number</th>
-            <th>Status</th>
-            <th>Work location</th>
-            <th>Start</th>
-            <th>Open</th>
+            <th>Номер</th>
+            <th>Статус</th>
+            <th>Место работ</th>
+            <th>Начало</th>
+            <th>Открыть</th>
         </tr>
         </thead>
         <tbody>
@@ -45,25 +45,25 @@
             <td><span class="{{ permit.status|permit_status_badge_class }}">{{ permit.status|permit_status_label }}</span></td>
             <td>{{ permit.work_location }}</td>
             <td>{{ permit.work_starts_at }}</td>
-            <td><a href="{% url 'permits:detail' permit.pk %}">Open</a></td>
+            <td><a href="{% url 'permits:detail' permit.pk %}">Открыть</a></td>
         </tr>
         {% empty %}
-        <tr><td colspan="5">No permits are waiting for your action.</td></tr>
+        <tr><td colspan="5">Нет нарядов, ожидающих вашего действия.</td></tr>
         {% endfor %}
         </tbody>
     </table>
 </section>
 
 <section>
-    <h3>Latest permits</h3>
+    <h3>Последние наряды</h3>
     <table>
         <thead>
         <tr>
-            <th>Number</th>
-            <th>Status</th>
-            <th>Work location</th>
-            <th>Created</th>
-            <th>Open</th>
+            <th>Номер</th>
+            <th>Статус</th>
+            <th>Место работ</th>
+            <th>Создан</th>
+            <th>Открыть</th>
         </tr>
         </thead>
         <tbody>
@@ -73,17 +73,17 @@
             <td><span class="{{ permit.status|permit_status_badge_class }}">{{ permit.status|permit_status_label }}</span></td>
             <td>{{ permit.work_location }}</td>
             <td>{{ permit.created_at }}</td>
-            <td><a href="{% url 'permits:detail' permit.pk %}">Open</a></td>
+            <td><a href="{% url 'permits:detail' permit.pk %}">Открыть</a></td>
         </tr>
         {% empty %}
-        <tr><td colspan="5">No permits yet.</td></tr>
+        <tr><td colspan="5">Наряды пока не созданы.</td></tr>
         {% endfor %}
         </tbody>
     </table>
 </section>
 
 <section>
-    <h3>Quick links</h3>
+    <h3>Быстрые ссылки</h3>
     <ul>
         {% for link in quick_links %}
         <li><a href="{{ link.url }}">{{ link.label }}</a></li>

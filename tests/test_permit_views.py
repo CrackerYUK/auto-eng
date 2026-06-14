@@ -173,9 +173,9 @@ class PermitViewTests(TestCase):
         response = self.client.get(reverse("permits:dashboard"))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Dashboard")
-        self.assertContains(response, "Permit counts by status")
-        self.assertContains(response, "Latest permits")
+        self.assertContains(response, "Панель управления")
+        self.assertContains(response, "Количество нарядов по статусам")
+        self.assertContains(response, "Последние наряды")
         self.assertContains(response, permit.number)
         self.assertContains(response, "status-badge status-draft")
         self.assertContains(response, "Создать наряд")
@@ -294,19 +294,19 @@ class PermitViewTests(TestCase):
         response = self.client.get(reverse("permits:detail", kwargs={"pk": permit.pk}))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Main fields")
+        self.assertContains(response, "Основные поля")
         self.assertContains(response, permit.number)
         self.assertContains(response, "status-badge status-draft")
         self.assertContains(response, action.comment)
         self.assertContains(response, document.file_docx.name)
-        self.assertContains(response, "Permit change history")
-        self.assertContains(response, "Changed at")
+        self.assertContains(response, "История изменений наряда")
+        self.assertContains(response, "Изменено")
         self.assertContains(response, "work_location")
-        self.assertContains(response, "old=Old location")
-        self.assertContains(response, f"new={permit.work_location}")
+        self.assertContains(response, "было=Old location")
+        self.assertContains(response, f"стало={permit.work_location}")
         self.assertContains(response, "Отправить на проверку")
         self.assertContains(response, "Действия")
-        self.assertContains(response, "Comment for Отправить на проверку")
+        self.assertContains(response, "Комментарий для Отправить на проверку")
         self.assertContains(response, "Участники и ответственные")
         self.assertContains(response, "Ответственные руководители")
         self.assertContains(response, "Иванов Иван Иванович")
@@ -837,7 +837,7 @@ class PermitDocxGenerationViewTests(TestCase):
         self.assertTrue(generated_document.file_docx.name.endswith(".docx"))
         self.assertTrue(generated_document.file_docx.storage.exists(generated_document.file_docx.name))
         self.assertEqual(generated_document.file_pdf.name, "")
-        self.assertContains(response, "DOCX document generated successfully")
+        self.assertContains(response, "DOCX-документ успешно сформирован")
         self.assertContains(
             response,
             reverse("permits:download_document", kwargs={"pk": generated_document.pk}),
@@ -855,7 +855,7 @@ class PermitDocxGenerationViewTests(TestCase):
 
         response = self.client.get(reverse("permits:detail", kwargs={"pk": permit.pk}))
 
-        self.assertContains(response, "Сгенерировать DOCX")
+        self.assertContains(response, "Сформировать DOCX")
         self.assertContains(
             response,
             reverse("permits:download_document", kwargs={"pk": generated_document.pk}),
@@ -866,7 +866,7 @@ class PermitDocxGenerationViewTests(TestCase):
 
         response = self.client.get(reverse("permits:detail", kwargs={"pk": permit.pk}))
 
-        self.assertContains(response, "Сгенерировать PDF")
+        self.assertContains(response, "Сформировать PDF")
         self.assertContains(
             response,
             reverse("permits:generate_pdf", kwargs={"pk": generated_document.pk}),
@@ -882,7 +882,7 @@ class PermitDocxGenerationViewTests(TestCase):
         )
 
         self.assertRedirects(response, reverse("permits:detail", kwargs={"pk": permit.pk}))
-        self.assertContains(response, "PDF conversion is disabled")
+        self.assertContains(response, "Конвертация PDF отключена")
         generated_document.refresh_from_db()
         self.assertEqual(generated_document.file_pdf.name, "")
 
@@ -897,7 +897,7 @@ class PermitDocxGenerationViewTests(TestCase):
         )
 
         self.assertRedirects(response, reverse("permits:detail", kwargs={"pk": permit.pk}))
-        self.assertContains(response, "LibreOffice/soffice executable was not found")
+        self.assertContains(response, "Исполняемый файл LibreOffice/soffice не найден")
         generated_document.refresh_from_db()
         self.assertEqual(generated_document.file_pdf.name, "")
 
@@ -920,7 +920,7 @@ class PermitDocxGenerationViewTests(TestCase):
         )
 
         self.assertRedirects(response, reverse("permits:detail", kwargs={"pk": permit.pk}))
-        self.assertContains(response, "PDF document generated successfully")
+        self.assertContains(response, "PDF-документ успешно сформирован")
         generated_document.refresh_from_db()
         self.assertTrue(generated_document.file_pdf.name.endswith(".pdf"))
         self.assertContains(
@@ -1028,7 +1028,7 @@ class PermitDocxGenerationViewTests(TestCase):
         )
 
         self.assertRedirects(response, reverse("permits:detail", kwargs={"pk": permit.pk}))
-        self.assertContains(response, "No active DOCX template for permit documents is configured.")
+        self.assertContains(response, "Активный DOCX-шаблон для нарядов не настроен.")
         self.assertFalse(GeneratedDocument.objects.filter(permit=permit).exists())
 
     def test_user_without_generation_role_cannot_generate_docx(self):
@@ -1065,12 +1065,12 @@ class PermitDocxGenerationViewTests(TestCase):
 
         response = self.client.get(reverse("permits:detail", kwargs={"pk": permit.pk}))
 
-        self.assertNotContains(response, "Сгенерировать DOCX")
-        self.assertContains(response, "DOCX generation is available only for approved or closed permits and allowed roles.")
+        self.assertNotContains(response, "Сформировать DOCX")
+        self.assertContains(response, "Формирование DOCX доступно только для утверждённых или закрытых нарядов")
 
     def test_closed_permit_shows_generate_docx_button_for_operator(self):
         permit = self.make_permit(number="PT-WEB-DOCX-CLOSED", status=PermitStatus.CLOSED)
 
         response = self.client.get(reverse("permits:detail", kwargs={"pk": permit.pk}))
 
-        self.assertContains(response, "Сгенерировать DOCX")
+        self.assertContains(response, "Сформировать DOCX")

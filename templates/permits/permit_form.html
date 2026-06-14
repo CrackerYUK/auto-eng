@@ -1,9 +1,9 @@
 {% extends "base.html" %}
 
-{% block title %}{% if object %}Edit permit{% else %}Create permit{% endif %}{% endblock %}
+{% block title %}{% if object %}Редактировать наряд{% else %}Создать наряд{% endif %}{% endblock %}
 
 {% block content %}
-<h2>{% if object %}Edit permit {{ object.number }}{% else %}Create permit{% endif %}</h2>
+<h2>{% if object %}Редактировать наряд {{ object.number }}{% else %}Создать наряд{% endif %}</h2>
 <form method="post">
     {% csrf_token %}
     {{ form.as_p }}
@@ -59,9 +59,9 @@
         <button type="button" id="add-participant">Добавить участника</button>
     </section>
 
-    <button type="submit">Save</button>
+    <button type="submit">Сохранить</button>
 </form>
-{% if object %}<p><a href="{% url 'permits:detail' object.pk %}">Back to permit</a></p>{% endif %}
+{% if object %}<p><a href="{% url 'permits:detail' object.pk %}">Вернуться к наряду</a></p>{% endif %}
 <script>
 (function () {
     const addButton = document.getElementById("add-participant");

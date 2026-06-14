@@ -14,7 +14,7 @@ from .services import DOCX_TEMPLATE_ERROR_MESSAGE, generate_template_demo_docx
 
 TEMPLATE_VARIABLES = [
     {"variable": "{{ nomer_naryada }}", "description": "Номер наряда-допуска", "example": "ND-2026-001"},
-    {"variable": "{{ status_naryada }}", "description": "Текущий статус наряда", "example": "Draft"},
+    {"variable": "{{ status_naryada }}", "description": "Текущий статус наряда", "example": "Черновик"},
     {"variable": "{{ uchastok }}", "description": "Участок выполнения работ", "example": "Цех 1"},
     {"variable": "{{ oborudovanie }}", "description": "Оборудование", "example": "Насос H-101"},
     {"variable": "{{ vid_rabot }}", "description": "Вид работ", "example": "Огневые работы"},
@@ -41,6 +41,7 @@ TEMPLATE_VARIABLES = [
     {"variable": "{{ uchastniki_rabot }}", "description": "Все участники наряда", "example": "Иванов И.И.\nПетров П.П."},
 ]
 TEMPLATE_VARIABLE_RULES = [
+    "Не используйте кириллицу внутри переменных DOCX. Используйте транслит-переменные из таблицы.",
     "использовать только транслит-переменные из таблицы.",
     "писать переменные строго как в таблице.",
     "не разрывать переменную переносом строки.",

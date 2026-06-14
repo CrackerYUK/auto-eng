@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="ru">
 <head>
     <meta charset="utf-8">
     <title>{% block title %}permit-system{% endblock %}</title>
@@ -37,9 +37,9 @@
 <header>
     <h1><a href="{% url 'permits:dashboard' %}">permit-system</a></h1>
     <nav>
-        <a href="{% url 'permits:dashboard' %}">Dashboard</a>
-        <a href="{% url 'permits:list' %}">Permits</a>
-        <a href="{% url 'permits:create' %}">Create permit</a>
+        <a href="{% url 'permits:dashboard' %}">Панель управления</a>
+        <a href="{% url 'permits:list' %}">Наряды</a>
+        <a href="{% url 'permits:create' %}">Создать наряд</a>
     </nav>
 </header>
 {% if messages %}

@@ -48,12 +48,29 @@ class PermitForm(forms.ModelForm):
             "work_supervisor",
         ]
         labels = {
+            "number": "Номер наряда",
+            "work_starts_at": "Начало работ",
+            "work_ends_at": "Окончание работ",
+            "work_location": "Место работ",
+            "work_area": "Участок",
+            "equipment": "Оборудование",
+            "work_type": "Вид работ",
+            "hazards": "Опасности",
+            "safety_measures": "Меры безопасности",
+            "work_description": "Описание работ",
+            "responsible_manager": "Ответственный руководитель (пользователь)",
+            "work_supervisor": "Производитель работ (пользователь)",
             "responsible_manager_text": "Ответственный руководитель работ (ручной ввод)",
             "work_producer_text": "Производитель работ (ручной ввод)",
             "work_nature_text": "Характер работ",
             "additional_conditions": "Дополнительные условия / уточнения",
             "additional_safety_notes": "Дополнительные меры безопасности / примечания",
         }
+        help_texts = {
+            "responsible_manager_text": "Можно оставить пустым, если ответственные указаны в блоке участников.",
+            "work_producer_text": "Можно оставить пустым, если производители работ указаны в блоке участников.",
+        }
+        error_messages = {field: {"required": "Заполните это поле."} for field in fields}
         widgets = {
             "work_starts_at": forms.DateTimeInput(attrs={"type": "datetime-local"}),
             "work_ends_at": forms.DateTimeInput(attrs={"type": "datetime-local"}),
@@ -86,11 +103,16 @@ class PermitParticipantForm(forms.ModelForm):
         model = PermitParticipant
         fields = ["role", "personnel", "manual_name", "note", "sort_order"]
         labels = {
+            "DELETE": "Удалить",
             "role": "Роль в наряде",
             "manual_name": "Ручной ввод, если работника нет в справочнике",
             "note": "Примечание",
             "sort_order": "Порядок",
         }
+        help_texts = {
+            "manual_name": "Заполняйте только если работника нет в справочнике.",
+        }
+        error_messages = {field: {"required": "Заполните это поле."} for field in fields}
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

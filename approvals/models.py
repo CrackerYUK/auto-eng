@@ -19,13 +19,15 @@ class ApprovalAction(models.Model):
         on_delete=models.PROTECT,
         related_name="approval_actions",
     )
-    action = models.CharField(max_length=64)
-    old_status = models.CharField(max_length=32, choices=PermitStatus.choices)
-    new_status = models.CharField(max_length=32, choices=PermitStatus.choices)
-    comment = models.TextField(blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
+    action = models.CharField("Действие", max_length=64)
+    old_status = models.CharField("Старый статус", max_length=32, choices=PermitStatus.choices)
+    new_status = models.CharField("Новый статус", max_length=32, choices=PermitStatus.choices)
+    comment = models.TextField("Комментарий", blank=True)
+    created_at = models.DateTimeField("Создано", auto_now_add=True)
 
     class Meta:
+        verbose_name = "Действие согласования"
+        verbose_name_plural = "Действия согласования"
         ordering = ["-created_at", "-id"]
 
     def __str__(self):

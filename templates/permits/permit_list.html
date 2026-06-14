@@ -1,21 +1,21 @@
 {% extends "base.html" %}
 {% load permit_status %}
 
-{% block title %}Permits{% endblock %}
+{% block title %}Наряды{% endblock %}
 
 {% block content %}
-<h2>Permits</h2>
+<h2>Наряды</h2>
 <table>
     <thead>
     <tr>
-        <th>Number</th>
-        <th>Status</th>
-        <th>Work location</th>
-        <th>Start</th>
-        <th>End</th>
-        <th>Author</th>
-        <th>Created</th>
-        <th>View</th>
+        <th>Номер</th>
+        <th>Статус</th>
+        <th>Место работ</th>
+        <th>Начало</th>
+        <th>Окончание</th>
+        <th>Автор</th>
+        <th>Создан</th>
+        <th>Просмотр</th>
     </tr>
     </thead>
     <tbody>
@@ -28,10 +28,10 @@
         <td>{{ permit.work_ends_at }}</td>
         <td>{{ permit.created_by }}</td>
         <td>{{ permit.created_at }}</td>
-        <td><a href="{% url 'permits:detail' permit.pk %}">Open</a></td>
+        <td><a href="{% url 'permits:detail' permit.pk %}">Открыть</a></td>
     </tr>
     {% empty %}
-    <tr><td colspan="8">No permits yet.</td></tr>
+    <tr><td colspan="8">Наряды пока не созданы.</td></tr>
     {% endfor %}
     </tbody>
 </table>

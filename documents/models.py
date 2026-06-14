@@ -7,19 +7,21 @@ from django.db import models
 class DocumentTemplate(models.Model):
     """DOCX template uploaded for permit document generation."""
 
-    name = models.CharField(max_length=255)
-    document_type = models.CharField(max_length=64)
-    version = models.CharField(max_length=32)
-    file = models.FileField(upload_to="document_templates/")
-    is_active = models.BooleanField(default=True)
+    name = models.CharField("Название", max_length=255)
+    document_type = models.CharField("Тип документа", max_length=64)
+    version = models.CharField("Версия", max_length=32)
+    file = models.FileField("Файл DOCX-шаблона", upload_to="document_templates/")
+    is_active = models.BooleanField("Активен", default=True)
     uploaded_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
         related_name="uploaded_document_templates",
     )
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField("Создано", auto_now_add=True)
 
     class Meta:
+        verbose_name = "DOCX-шаблон"
+        verbose_name_plural = "DOCX-шаблоны"
         ordering = ["document_type", "-created_at"]
         constraints = [
             models.UniqueConstraint(
@@ -45,16 +47,18 @@ class GeneratedDocument(models.Model):
         on_delete=models.PROTECT,
         related_name="generated_documents",
     )
-    file_docx = models.FileField(upload_to="generated_documents/docx/")
-    file_pdf = models.FileField(upload_to="generated_documents/pdf/", blank=True)
+    file_docx = models.FileField("Файл DOCX", upload_to="generated_documents/docx/")
+    file_pdf = models.FileField("Файл PDF", upload_to="generated_documents/pdf/", blank=True)
     generated_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
         related_name="generated_documents",
     )
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField("Создано", auto_now_add=True)
 
     class Meta:
+        verbose_name = "Сформированный документ"
+        verbose_name_plural = "Сформированные документы"
         ordering = ["-created_at", "-id"]
 
     def __str__(self):

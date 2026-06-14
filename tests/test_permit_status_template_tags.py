@@ -15,7 +15,7 @@ class PermitStatusTemplateTagTests(SimpleTestCase):
     def test_permit_status_label_returns_human_readable_label(self):
         self.assertEqual(
             permit_status_label(PermitStatus.APPROVED_BY_CHIEF),
-            "Approved by chief",
+            "Утверждён начальником",
         )
 
     def test_permit_status_label_preserves_unknown_status(self):
