@@ -1,0 +1,36 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+<div id="content-main">
+    <p><a href="{% url 'admin:documents_documenttemplate_changelist' %}">← К списку DOCX-шаблонов</a></p>
+
+    <h1>Переменные DOCX-шаблона</h1>
+    <p>Используйте эти переменные в DOCX-файлах, загружаемых как DocumentTemplate.</p>
+
+    <h2>Краткие правила</h2>
+    <ul>
+        {% for rule in rules %}
+        <li>{{ rule }}</li>
+        {% endfor %}
+    </ul>
+
+    <table>
+        <thead>
+        <tr>
+            <th>Переменная</th>
+            <th>Что означает</th>
+            <th>Пример значения</th>
+        </tr>
+        </thead>
+        <tbody>
+        {% for item in template_variables %}
+        <tr>
+            <td><code>{{ item.variable }}</code></td>
+            <td>{{ item.description }}</td>
+            <td>{{ item.example }}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

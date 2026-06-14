@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+
+{% block title %}{% if object %}Edit permit{% else %}Create permit{% endif %}{% endblock %}
+
+{% block content %}
+<h2>{% if object %}Edit permit {{ object.number }}{% else %}Create permit{% endif %}</h2>
+<form method="post">
+    {% csrf_token %}
+    {{ form.as_p }}
+
+    <section>
+        <h3>Участники и ответственные</h3>
+        <p>Выберите работника из справочника или впишите участника вручную, если его нет в справочнике.</p>
+        {{ participant_formset.management_form }}
+        {{ participant_formset.non_form_errors }}
+        <table id="participant-formset">
+            <thead>
+            <tr>
+                <th>Роль</th>
+                <th>Работник из справочника</th>
+                <th>Ручной ввод</th>
+                <th>Примечание</th>
+                <th>Порядок</th>
+                <th>Удалить</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for participant_form in participant_formset %}
+            <tr class="participant-row">
+                <td>
+                    {{ participant_form.id }}
+                    {{ participant_form.role.errors }}
+                    {{ participant_form.role }}
+                </td>
+                <td>
+                    {{ participant_form.personnel.errors }}
+                    {{ participant_form.personnel }}
+                </td>
+                <td>
+                    {{ participant_form.manual_name.errors }}
+                    {{ participant_form.manual_name }}
+                </td>
+                <td>
+                    {{ participant_form.note.errors }}
+                    {{ participant_form.note }}
+                </td>
+                <td>
+                    {{ participant_form.sort_order.errors }}
+                    {{ participant_form.sort_order }}
+                </td>
+                <td>
+                    {% if participant_form.DELETE %}{{ participant_form.DELETE }}{% endif %}
+                    {{ participant_form.non_field_errors }}
+                </td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        <button type="button" id="add-participant">Добавить участника</button>
+    </section>
+
+    <button type="submit">Save</button>
+</form>
+{% if object %}<p><a href="{% url 'permits:detail' object.pk %}">Back to permit</a></p>{% endif %}
+<script>
+(function () {
+    const addButton = document.getElementById("add-participant");
+    const tableBody = document.querySelector("#participant-formset tbody");
+    const totalForms = document.getElementById("id_participants-TOTAL_FORMS");
+    if (!addButton || !tableBody || !totalForms) {
+        return;
+    }
+
+    addButton.addEventListener("click", function () {
+        const rows = tableBody.querySelectorAll(".participant-row");
+        if (!rows.length) {
+            return;
+        }
+        const newIndex = parseInt(totalForms.value, 10);
+        const lastRow = rows[rows.length - 1];
+        const newRow = lastRow.cloneNode(true);
+        newRow.querySelectorAll("input, select, textarea, label").forEach(function (element) {
+            ["name", "id", "for"].forEach(function (attribute) {
+                const value = element.getAttribute(attribute);
+                if (value) {
+                    element.setAttribute(attribute, value.replace(/participants-\d+-/g, "participants-" + newIndex + "-"));
+                }
+            });
+            if (element.tagName === "SELECT") {
+                element.selectedIndex = 0;
+            } else if (element.type === "checkbox") {
+                element.checked = false;
+            } else {
+                element.value = "";
+            }
+        });
+        tableBody.appendChild(newRow);
+        totalForms.value = newIndex + 1;
+    });
+})();
+</script>
+{% endblock %}

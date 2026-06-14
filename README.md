@@ -1,2 +1,334 @@
-# auto-eng
-Программа по формированию отчетности, документов и видов работ.
+# permit-system
+
+Внутренняя веб-система для создания, согласования, хранения и печати нарядов-допусков по DOCX-шаблонам.
+
+## Технологии
+
+- Python
+- Django
+- PostgreSQL
+- Docker Compose
+- docxtpl для генерации DOCX
+- pytest / Django tests
+
+## Структура проекта
+
+- `permit_system/` — настройки и корневые URL Django-проекта.
+- `users/` — пользователи и роли.
+- `permits/` — наряды-допуски.
+- `approvals/` — маршруты и статусы согласования.
+- `documents/` — DOCX-шаблоны и генерация документов.
+- `audit/` — аудит действий пользователей.
+- `tests/` — smoke-тесты каркаса проекта.
+- `requirements.txt` — runtime-зависимости приложения.
+- `requirements-dev.txt` — зависимости для разработки и тестов.
+
+## Запуск локально через Docker Compose
+
+Docker Compose поднимает полный локальный стек: Django-приложение `web` и PostgreSQL `db`.
+
+Соберите и запустите сервисы:
+
+```bash
+docker compose up --build
+```
+
+После запуска приложение будет доступно по адресу:
+
+```text
+http://localhost:8000/
+```
+
+Проверка работоспособности:
+
+```text
+http://localhost:8000/health/
+```
+
+В контейнере `web` миграции применяются автоматически при старте. При необходимости можно выполнить команду вручную:
+
+```bash
+docker compose run --rm web python manage.py migrate
+```
+
+Запуск тестов через Docker Compose:
+
+```bash
+docker compose run --rm web python manage.py test
+```
+
+## Offline local run
+
+Проект можно запускать локально без PostgreSQL и Docker. Если переменная `DATABASE_URL` не задана, Django автоматически использует SQLite-файл `db.sqlite3` в корне репозитория. Это удобно для быстрой проверки интерфейса, миграций и тестов в изолированном окружении.
+
+Минимальный запуск без PostgreSQL:
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements-dev.txt
+unset DATABASE_URL
+python manage.py migrate
+python manage.py setup_roles
+python manage.py seed_demo_data
+python manage.py runserver
+```
+
+После запуска приложение будет доступно по адресу:
+
+```text
+http://127.0.0.1:8000/
+```
+
+Для PostgreSQL нужно задать `DATABASE_URL`, например:
+
+```bash
+export DATABASE_URL=postgresql://permit_system:permit_system@localhost:5432/permit_system
+```
+
+Если `DATABASE_URL` задан, проект использует PostgreSQL. Если `DATABASE_URL` отсутствует, проект использует SQLite. Модели и миграции при этом не меняются.
+
+Интерфейс не зависит от внешних CDN, Google Fonts или других интернет-ресурсов: страницы используют локальные Django templates и встроенные стили проекта. Поэтому локальный запуск интерфейса возможен без доступа к интернету после установки Python-зависимостей.
+
+## Deployment
+
+Для тестового развёртывания на сервере организации используйте `docker-compose.yml` как базовый Compose-файл приложения и PostgreSQL. Перед запуском создайте `.env` из примера:
+
+```bash
+cp .env.example .env
+```
+
+Обязательно измените значения:
+
+- `DJANGO_SECRET_KEY` — длинный случайный секрет;
+- `DJANGO_DEBUG=0` для тестового/серверного окружения;
+- `DJANGO_ALLOWED_HOSTS` — домены или IP-адреса сервера;
+- `DATABASE_URL` — строка подключения к PostgreSQL;
+- `STATIC_ROOT` — путь для собранной статики внутри контейнера/сервера;
+- `MEDIA_ROOT` — путь для загруженных DOCX/PDF и других media-файлов;
+- `PDF_CONVERTER_ENABLED` — включение PDF-конвертации;
+- `SOFFICE_PATH` — путь или имя LibreOffice/`soffice`, если PDF включён.
+
+Пример запуска:
+
+```bash
+docker compose up --build -d
+```
+
+Команды обслуживания:
+
+```bash
+docker compose run --rm web python manage.py migrate
+docker compose run --rm web python manage.py collectstatic --noinput
+docker compose run --rm web python manage.py createsuperuser
+docker compose run --rm web python manage.py setup_roles
+docker compose run --rm web python manage.py seed_demo_data
+```
+
+`seed_demo_data` предназначен только для тестовой демонстрации и не должен использоваться для production-данных.
+
+В `docker-compose.yml` настроены named volumes:
+
+- `postgres_data` — данные PostgreSQL;
+- `media_files` — загруженные шаблоны и сгенерированные DOCX/PDF;
+- `static_files` — собранная статика Django.
+
+Nginx/HTTPS/reverse proxy на этом этапе не добавлены в Compose, чтобы не усложнять тестовое развёртывание. Следующий этап для серверной эксплуатации — добавить внешний reverse proxy, TLS и правила отдачи static/media.
+
+## Проверки без Docker
+
+Для запуска проверок без Docker создайте и активируйте виртуальное окружение, затем установите dev-зависимости:
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements-dev.txt
+```
+
+Если переменная `POSTGRES_HOST` не задана, проект использует SQLite по умолчанию. Это позволяет запускать базовые проверки без Docker и без локального PostgreSQL:
+
+```bash
+python manage.py check
+python manage.py test
+```
+
+При необходимости можно также запускать pytest:
+
+```bash
+pytest
+```
+
+## Команды для Codex Cloud
+
+В Codex Cloud Docker может отсутствовать, а доступ к package index может быть ограничен. Поэтому `docker compose config` и другие Docker-команды не являются обязательными cloud-check командами.
+
+Основные и обязательные проверки Codex Cloud:
+
+```bash
+python manage.py check
+python manage.py test
+```
+
+В Codex Cloud не нужно выполнять генерацию скриншотов или проверять наличие браузеров/утилит для визуальных снимков. Отсутствие Chromium, Firefox, wkhtmltoimage или аналогичных инструментов не является ошибкой проекта. UI-проверки в Codex Cloud выполняются через Django test client: `status_code`, отрисовку шаблонов, ожидаемый HTML-текст, кнопки, ссылки и формы. Ручной визуальный просмотр выполняется локально или на сервере развёртывания.
+
+Если зависимости ещё не установлены и команда установки завершается ошибкой доступа к package index, например `403 Forbidden`, это ограничение окружения Codex Cloud, а не ошибка кода. В таком случае в итоговом отчёте нужно явно указать, что проверки не были выполнены из-за недоступности зависимостей.
+
+
+## Базовые роли
+
+Проект использует стандартные Django Groups/Permissions для базовой ролевой модели.
+Начальные группы:
+
+- `operator`
+- `master`
+- `chief`
+- `admin`
+
+После применения миграций создайте или обновите группы и их базовые права командой:
+
+```bash
+python manage.py setup_roles
+```
+
+При запуске через Docker Compose используйте:
+
+```bash
+docker compose run --rm web python manage.py setup_roles
+```
+
+Команда идемпотентна: её можно запускать повторно, чтобы привести права групп к текущим настройкам проекта.
+
+## Demo setup
+
+Для локальной демонстрации сначала примените миграции:
+
+```bash
+python manage.py migrate
+```
+
+Затем создайте непроизводственные тестовые данные командой:
+
+```bash
+python manage.py seed_demo_data
+```
+
+При запуске через Docker Compose используйте:
+
+```bash
+docker compose run --rm web python manage.py migrate
+docker compose run --rm web python manage.py seed_demo_data
+```
+
+Команда идемпотентна и создаёт только demo-данные:
+
+- пользователей `operator`, `master`, `chief`, `admin`;
+- группы и роли через существующую команду `setup_roles`;
+- demo-участки, оборудование, виды работ, опасности и меры безопасности;
+- несколько нарядов-допусков в разных статусах.
+
+Пароль для demo-пользователей:
+
+```text
+demo12345
+```
+
+Логины demo-пользователей совпадают с именами пользователей:
+
+- `operator`;
+- `master`;
+- `chief`;
+- `admin`.
+
+Эти данные предназначены только для локальной демонстрации и не должны использоваться как производственные данные.
+
+## DOCX-шаблоны
+
+DOCX-генерация выполняется через `docxtpl` и сервис `generate_permit_docx`. Для новых шаблонов используйте безопасные транслит-переменные и не используйте кириллицу внутри `{{ ... }}`:
+
+```text
+{{ nomer_naryada }}
+{{ status_naryada }}
+{{ uchastok }}
+{{ oborudovanie }}
+{{ vid_rabot }}
+{{ mesto_rabot }}
+{{ opisanie_rabot }}
+{{ harakter_rabot }}
+{{ data_nachala }}
+{{ data_okonchaniya }}
+{{ data_sozdaniya }}
+{{ otvetstvennyy_rukovoditel }}
+{{ proizvoditel_rabot }}
+{{ sozdal_polzovatel }}
+{{ opasnosti }}
+{{ mery_bezopasnosti }}
+{{ dopolnitelnye_usloviya }}
+{{ dopolnitelnye_mery_bezopasnosti }}
+{{ otvetstvennye_rukovoditeli }}
+{{ proizvoditeli_rabot }}
+{{ ispolniteli }}
+{{ chleny_brigady }}
+{{ dopuskayushchie }}
+{{ nablyudayushchie }}
+{{ prochie_uchastniki }}
+{{ uchastniki_rabot }}
+```
+
+Существующие английские переменные вида `{{ permit.number }}` и `{{ permit.work_location }}` остаются совместимыми, чтобы старые шаблоны не ломались. Даты в транслит-переменных отдаются в формате `ДД.ММ.ГГГГ`, списки опасностей и мер безопасности — готовым текстом через запятую, списки участников — по одному участнику на строку, пустые значения — пустой строкой. Подробная карта переменных находится в `DOCX_TEMPLATE_MAPPING.md`.
+
+В наряде можно сочетать справочники и ручные значения: `WorkArea`, `Equipment`, `WorkType`, `Hazard` и `SafetyMeasure` остаются типовыми справочниками, ручные поля уточняют нестандартные место/характер работ и дополнительные условия, а участники выбираются через отдельный блок **«Участники и ответственные»**. Для проверки шаблона без реального наряда в Django admin у `DocumentTemplate` есть кнопка **«Проверить шаблон»**: она генерирует тестовый DOCX на demo-данных и не создаёт `GeneratedDocument`.
+
+## Справочник персонала
+
+Персонал хранится отдельно от пользователей сайта:
+
+- `PersonnelGroup` — группы работников, например мастера, машинисты, слесари, электромонтёры и ИТР;
+- `Personnel` — работники из справочника с ФИО, табельным номером, должностью, подразделением, участком и контактами;
+- `PermitParticipant` — участники конкретного наряда с ролью, выбранным работником из справочника или ручным вводом.
+
+Работники из `Personnel` не получают логин/пароль и не являются `User`. Пользователи сайта нужны только для входа, ролей и аудита действий.
+
+Чтобы подготовить справочник:
+
+1. В Django admin добавьте группы персонала.
+2. Добавьте работников и привяжите их к группе, а при необходимости — к участку.
+3. При создании или редактировании Permit в блоке **«Участники и ответственные»** выберите роль и работника из справочника.
+4. Если работника нет в справочнике, оставьте поле работника пустым и заполните ручной ввод участника.
+5. При необходимости добавьте примечание: оно попадёт в отображение участника и DOCX context.
+
+## PDF export
+
+В проект добавлен подготовительный слой для будущего PDF-экспорта.
+
+Основная DOCX-генерация остаётся в сервисе `generate_permit_docx` и продолжает создавать DOCX-файлы. PDF-конвертация вынесена в отдельный сервис `convert_docx_to_pdf` и по умолчанию выключена.
+
+Настройки PDF-конвертации:
+
+- `PDF_CONVERTER_ENABLED` — включает PDF-конвертацию, по умолчанию выключен (`0`);
+- `SOFFICE_PATH` — путь или имя исполняемого файла LibreOffice/`soffice`, по умолчанию `soffice`.
+
+Пример включения на сервере, где установлен LibreOffice:
+
+```bash
+export PDF_CONVERTER_ENABLED=1
+export SOFFICE_PATH=/usr/bin/soffice
+```
+
+Для реального PDF-экспорта на сервере должен быть установлен LibreOffice/`soffice`. Если конвертер выключен или `soffice` отсутствует, сервис возвращает понятную ошибку и не ломает DOCX-генерацию.
+
+В автоматических тестах реальный LibreOffice не требуется: PDF-конвертация проверяется через mock.
+
+## Переменные окружения
+
+Основные переменные окружения для Docker Compose и PostgreSQL задаются в `docker-compose.yml`:
+
+- `DJANGO_DEBUG`
+- `DJANGO_SECRET_KEY`
+- `DJANGO_ALLOWED_HOSTS`
+- `POSTGRES_DB`
+- `POSTGRES_USER`
+- `POSTGRES_PASSWORD`
+- `POSTGRES_HOST`
+- `POSTGRES_PORT`
+
+Если `POSTGRES_HOST` не задан, Django использует локальную SQLite-базу `db.sqlite3` для проверок и разработки без Docker.

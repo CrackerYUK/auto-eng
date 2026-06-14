@@ -1,0 +1,8 @@
+{% extends "admin/change_list.html" %}
+
+{% block object-tools-items %}
+<li>
+    <a href="{% url 'admin:documents_documenttemplate_template_variables' %}" class="historylink">Переменные шаблона</a>
+</li>
+{{ block.super }}
+{% endblock %}
