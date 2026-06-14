@@ -626,6 +626,17 @@ class PermitDocxGenerationViewTests(TestCase):
         )
         return permit, generated_document
 
+    def assert_download_response_closed(self, response, filename=None):
+        try:
+            self.assertEqual(response.status_code, 200)
+            self.assertIn("attachment", response["Content-Disposition"])
+            if filename is not None:
+                self.assertIn(filename, response["Content-Disposition"])
+            if getattr(response, "streaming", False):
+                b"".join(response.streaming_content)
+        finally:
+            response.close()
+
     def test_generate_docx_creates_document_and_saves_file(self):
         permit = self.make_permit()
         self.create_template()
@@ -770,9 +781,10 @@ class PermitDocxGenerationViewTests(TestCase):
             reverse("permits:download_document", kwargs={"pk": generated_document.pk})
         )
 
-        self.assertEqual(response.status_code, 200)
-        self.assertIn("attachment", response["Content-Disposition"])
-        self.assertIn(generated_document.file_docx.name.rsplit("/", 1)[-1], response["Content-Disposition"])
+        self.assert_download_response_closed(
+            response,
+            generated_document.file_docx.name.rsplit("/", 1)[-1],
+        )
 
     def test_unauthenticated_user_cannot_download_document(self):
         permit = self.make_permit(number="PT-WEB-DOCX-003")
@@ -801,8 +813,7 @@ class PermitDocxGenerationViewTests(TestCase):
             reverse("permits:download_document", kwargs={"pk": generated_document.pk})
         )
 
-        self.assertEqual(response.status_code, 200)
-        self.assertIn("attachment", response["Content-Disposition"])
+        self.assert_download_response_closed(response)
 
     def test_unrelated_user_cannot_download_document(self):
         permit = self.make_permit(number="PT-WEB-DOCX-004")
