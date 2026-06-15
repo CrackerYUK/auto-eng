@@ -50,7 +50,19 @@ class AuthenticationViewTests(TestCase):
         response = self.client.get(reverse("login"))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Login")
+        self.assertContains(response, "Вход")
+        self.assertContains(response, "Имя пользователя")
+        self.assertContains(response, "Пароль")
+        self.assertContains(response, "Войти")
+
+    def test_invalid_login_shows_russian_error(self):
+        response = self.client.post(
+            reverse("login"),
+            data={"username": "missing-user", "password": "bad-pass"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Неверное имя пользователя или пароль.")
 
 
 class PermitViewTests(TestCase):
@@ -298,10 +310,11 @@ class PermitViewTests(TestCase):
         self.assertContains(response, permit.number)
         self.assertContains(response, "status-badge status-draft")
         self.assertContains(response, action.comment)
+        self.assertContains(response, "Отправлен мастеру")
         self.assertContains(response, document.file_docx.name)
         self.assertContains(response, "История изменений наряда")
         self.assertContains(response, "Изменено")
-        self.assertContains(response, "work_location")
+        self.assertContains(response, "Место проведения работ")
         self.assertContains(response, "было=Old location")
         self.assertContains(response, f"стало={permit.work_location}")
         self.assertContains(response, "Отправить на проверку")

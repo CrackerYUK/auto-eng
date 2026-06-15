@@ -93,7 +93,7 @@ docker compose up --build
 ## Известные ограничения
 - Production deployment требует `.env`: `DJANGO_SECRET_KEY`, `DJANGO_DEBUG=0`, `DJANGO_ALLOWED_HOSTS`, `CSRF_TRUSTED_ORIGINS`, `DATABASE_URL`, `STATIC_ROOT`, `MEDIA_ROOT`.
 - Реальный официальный DOCX-шаблон организации нужно загрузить отдельно.
-- PDF зависит от LibreOffice/`soffice` и выключен по умолчанию через `PDF_CONVERTER_ENABLED=0`.
+- PDF-кнопка и сервисная заготовка реализованы, но конвертер выключен по умолчанию через `PDF_CONVERTER_ENABLED=0` и требует LibreOffice/`soffice`; production-ready PDF-сценарий остаётся pending.
 - Полноценный autocomplete персонала pending; сейчас есть select и endpoint `/personnel/search/?q=`.
 - Ручной выбор конкретного активного шаблона в пользовательском UI pending.
 - React и внешние CDN не используются.
